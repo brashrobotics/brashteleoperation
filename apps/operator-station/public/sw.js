@@ -11,7 +11,10 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  // Let the browser perform normal CORS handling for the robot edge and media
+  // gateway. Reconstructing their credentialed cross-origin requests inside a
+  // service worker can turn a valid response into an opaque network failure.
+  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
   // Network-only by design. Stale operator or robot state must not be available
   // merely because the application shell was previously opened.
   event.respondWith(fetch(new Request(event.request, { cache: "no-store" })));

@@ -227,6 +227,7 @@ async function requestDirectSession(event) {
   event.preventDefault();
   let pendingSession;
   let edgeLeaseInstalled = false;
+  let setupStage = "validating simulator settings";
   try {
     if (state.simulation) throw new Error("SIM_SESSION_ACTIVE: release the current simulator session first.");
     state.edgeApiUrl = normalizeEdgeApiUrl($("#edge-api-url").value);
@@ -236,27 +237,35 @@ async function requestDirectSession(event) {
     const robotId = $("#direct-robot-id").value;
     const sessionId = crypto.randomUUID();
     showNotice("Requesting the lease and robot-local stopped handoff…");
+    setupStage = "requesting a control session";
     let body = await api("/control/v1/sessions", { method:"POST", body:JSON.stringify({ sessionId, robotId, operatorId:state.operatorId, scopes:["OBSERVE","CONTROL_BASE"] }) });
     pendingSession = body.session;
+    setupStage = "granting the simulator lease";
     body = await api(`/control/v1/sessions/${sessionId}/grant`, { method:"POST", body:JSON.stringify({ expectedRevision:body.session.revision, leaseDurationMs:Number($("#lease-seconds").value)*1000 }) });
     pendingSession = body.session;
     const granted = body;
+    setupStage = "installing the simulator lease at the robot edge";
     if (body.signedLease) {
       await edgeApi("/edge/v1/signed-leases", { method:"POST", body:JSON.stringify({ signedLease:body.signedLease }) });
     } else {
       await edgeApi("/edge/v1/leases", { method:"POST", body:JSON.stringify({ lease:body.session.lease }) });
     }
     edgeLeaseInstalled = true;
+    setupStage = "marking the control session as connecting";
     body = await api(`/control/v1/sessions/${sessionId}/connecting`, { method:"POST", body:JSON.stringify({ expectedRevision:body.session.revision }) });
     const connectingSession = body.session;
     pendingSession = connectingSession;
+    setupStage = "requesting robot-local base ownership";
     await edgeApi("/edge/v1/ownership/request", { method:"POST", body:JSON.stringify({ sessionId, actuatorGroup:"BASE" }) });
+    setupStage = "waiting for robot-local stopped handoff";
     const edgeState = await waitForEdgeState((candidate) => candidate.ownership?.status === "OWNED", 8_000);
+    setupStage = "activating the control-plane session";
     const activeSession = await activateControlSession(connectingSession, 5_000);
     pendingSession = activeSession;
     state.simulation = { session:activeSession, lease:granted.session.lease };
     state.simulationEdgeState = edgeState;
     state.commandSequence = 1;
+    setupStage = "enabling robot-local simulation safety";
     await armSimulationSafety();
     renderSimulationState(state.simulationEdgeState);
     startSimulatorCamera();
@@ -269,7 +278,7 @@ async function requestDirectSession(event) {
     await refreshAll();
   } catch (error) {
     const cleanupWarning = await cleanupFailedSimulatorConnection(pendingSession, edgeLeaseInstalled);
-    showNotice(`${error.message}${cleanupWarning ? ` Cleanup warning: ${cleanupWarning}` : ""}`, true);
+    showNotice(`Simulator setup failed while ${setupStage}: ${error.message}${cleanupWarning ? ` Cleanup warning: ${cleanupWarning}` : ""}`, true);
   }
 }
 

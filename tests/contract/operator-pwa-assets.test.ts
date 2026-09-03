@@ -24,6 +24,7 @@ test("installable operator shell remains network-only and labels its mobile boun
   assert.equal(manifest.display, "standalone");
   assert.ok(manifest.icons.some((icon) => icon.purpose.includes("maskable")));
   assert.match(worker, /cache: "no-store"/);
+  assert.match(worker, /new URL\(event\.request\.url\)\.origin !== self\.location\.origin/);
   assert.doesNotMatch(worker, /caches\.open/);
   assert.match(application, /x-brash-observation-id/);
   assert.match(application, /crypto\.subtle\.digest\("SHA-256"/);
