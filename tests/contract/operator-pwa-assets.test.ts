@@ -29,6 +29,8 @@ test("installable operator shell remains network-only and labels its mobile boun
   assert.match(application, /crypto\.subtle\.digest\("SHA-256"/);
   assert.match(application, /enableBoxSelection/);
   assert.match(application, /normalizeEdgeApiUrl/);
+  assert.match(application, /cleanupFailedSimulatorConnection/);
+  assert.match(application, /Simulator connection did not complete/);
   assert.match(application, /deadman:true/);
   assert.match(application, /edge\/v1\/safety\/hold/);
   assert.doesNotMatch(application, /hardware\/cmd_vel/);

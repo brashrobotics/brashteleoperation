@@ -216,6 +216,8 @@ async function mutateRequest(item, action, fields) {
 
 async function requestDirectSession(event) {
   event.preventDefault();
+  let pendingSession;
+  let edgeLeaseInstalled = false;
   try {
     if (state.simulation) throw new Error("SIM_SESSION_ACTIVE: release the current simulator session first.");
     state.edgeApiUrl = normalizeEdgeApiUrl($("#edge-api-url").value);
@@ -226,18 +228,23 @@ async function requestDirectSession(event) {
     const sessionId = crypto.randomUUID();
     showNotice("Requesting the lease and robot-local stopped handoff…");
     let body = await api("/control/v1/sessions", { method:"POST", body:JSON.stringify({ sessionId, robotId, operatorId:state.operatorId, scopes:["OBSERVE","CONTROL_BASE"] }) });
+    pendingSession = body.session;
     body = await api(`/control/v1/sessions/${sessionId}/grant`, { method:"POST", body:JSON.stringify({ expectedRevision:body.session.revision, leaseDurationMs:Number($("#lease-seconds").value)*1000 }) });
+    pendingSession = body.session;
     const granted = body;
     if (body.signedLease) {
       await edgeApi("/edge/v1/signed-leases", { method:"POST", body:JSON.stringify({ signedLease:body.signedLease }) });
     } else {
       await edgeApi("/edge/v1/leases", { method:"POST", body:JSON.stringify({ lease:body.session.lease }) });
     }
+    edgeLeaseInstalled = true;
     body = await api(`/control/v1/sessions/${sessionId}/connecting`, { method:"POST", body:JSON.stringify({ expectedRevision:body.session.revision }) });
     const connectingSession = body.session;
+    pendingSession = connectingSession;
     await edgeApi("/edge/v1/ownership/request", { method:"POST", body:JSON.stringify({ sessionId, actuatorGroup:"BASE" }) });
     const edgeState = await waitForEdgeState((candidate) => candidate.ownership?.status === "OWNED", 8_000);
     const activeSession = await activateControlSession(connectingSession, 5_000);
+    pendingSession = activeSession;
     state.simulation = { session:activeSession, lease:granted.session.lease };
     state.simulationEdgeState = edgeState;
     state.commandSequence = 1;
@@ -248,8 +255,44 @@ async function requestDirectSession(event) {
       : "Unsigned simulation lease";
     $("#direct-result").textContent = `Session ${sessionId}\nStatus ${activeSession.status}\nLease r${granted.session.lease.revision}\n${signing}\nExpires ${new Date(granted.session.lease.expiresAtUnixMs).toLocaleTimeString()}\n\nB2W Gazebo ownership and safety are ready.`;
     showNotice("B2W Gazebo control ready. Hold a direction, or Space plus W/A/S/D.");
+    pendingSession = undefined;
     await refreshAll();
-  } catch (error) { showNotice(error.message, true); }
+  } catch (error) {
+    const cleanupWarning = await cleanupFailedSimulatorConnection(pendingSession, edgeLeaseInstalled);
+    showNotice(`${error.message}${cleanupWarning ? ` Cleanup warning: ${cleanupWarning}` : ""}`, true);
+  }
+}
+
+async function cleanupFailedSimulatorConnection(session, edgeLeaseInstalled) {
+  const warnings = [];
+  state.deadmanIntent = false;
+  state.deadmanHeld = false;
+  clearTimeout(state.commandTimer);
+  state.commandTimer = undefined;
+  state.simulation = undefined;
+  state.simulationEdgeState = undefined;
+  renderSimulationState(undefined);
+  if (edgeLeaseInstalled && session?.sessionId) {
+    try {
+      await edgeApi(`/edge/v1/leases/${encodeURIComponent(session.sessionId)}/revoke`, {
+        method:"POST",
+        body:JSON.stringify({ reason:"Simulator connection did not complete." }),
+      });
+    } catch (error) {
+      warnings.push(`edge lease: ${error.message}`);
+    }
+  }
+  if (session?.sessionId && !["RELEASED", "EXPIRED", "REVOKED", "FAULTED"].includes(session.status)) {
+    try {
+      await api(`/control/v1/sessions/${encodeURIComponent(session.sessionId)}/revoke`, {
+        method:"POST",
+        body:JSON.stringify({ expectedRevision:session.revision, reason:"Simulator connection did not complete." }),
+      });
+    } catch (error) {
+      warnings.push(`control session: ${error.message}`);
+    }
+  }
+  return warnings.join("; ");
 }
 
 async function activateControlSession(session, timeoutMs) {
