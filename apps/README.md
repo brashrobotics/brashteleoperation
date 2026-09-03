@@ -7,6 +7,7 @@ Contains user-facing applications that are deployed and started directly.
 ## Components
 
 - [Operator station](operator-station/README.md)
+- [Direct B2W simulator](direct-teleop-simulator/README.md)
 - [Mobile operator application](operator-mobile/README.md)
 - [Control-plane API](control-plane-api/README.md)
 - [Vertical-slice demo](vertical-slice-demo/README.md)

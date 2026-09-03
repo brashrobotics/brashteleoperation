@@ -130,6 +130,10 @@ Touch controls use a held direction as their deadman. Keyboard controls require
 holding Space plus W/A/S/D. Every release requests hold and the edge watchdog
 independently zeros stale commands.
 
+The direction controls are intentionally not click-to-latch: a quick click is
+only one short command and may stop before visually obvious displacement. Hold
+the pointer button, or hold Space together with W/A/S/D, to stream motion.
+
 ## Next milestone
 
 Add depth-aligned overlays, lasso/mask correction, adaptive production WebRTC

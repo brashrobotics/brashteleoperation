@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0a0f0c">
+    <title>BRASH Direct B2W Teleop</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span>B</span><div><strong>BRASH</strong><small>Direct B2W simulator</small></div></div>
+      <div class="connection"><i id="connection-dot"></i><span id="connection-label">Connecting…</span></div>
+    </header>
+
+    <main>
+      <section class="warning">
+        <strong>GAZEBO ONLY</strong>
+        <span>Tokenless local development console · physical Unitree output is disabled</span>
+      </section>
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow">DIRECT TELEOPERATION</p>
+          <h1>Drive the B2W.</h1>
+          <p>No perception workflow, object declaration, or credential entry. Opening this loopback page automatically requests a simulation lease and robot-local stopped handoff.</p>
+        </div>
+        <button id="reconnect" class="secondary">Reconnect</button>
+      </section>
+
+      <p id="notice" class="notice" role="status" aria-live="polite">Starting a safe simulator session…</p>
+
+      <section class="telemetry" aria-label="Robot state">
+        <div><span>Session</span><strong id="session-state">—</strong></div>
+        <div><span>Ownership</span><strong id="ownership-state">—</strong></div>
+        <div><span>Safety</span><strong id="safety-state">—</strong></div>
+        <div><span>Accepted motion</span><strong id="accepted-motion">0.00 m/s · 0.00 rad/s</strong></div>
+      </section>
+
+      <section class="workbench">
+        <figure class="camera-card">
+          <div class="camera-viewport">
+            <div id="camera-placeholder"><strong>Front camera</strong><small>Waiting for Gazebo…</small></div>
+            <img id="camera-frame" alt="Live B2W Gazebo front camera" hidden>
+            <div class="camera-badge"><i id="camera-dot"></i><span id="camera-label">Offline</span></div>
+          </div>
+          <figcaption><span id="camera-frame-label">b2w-sim-front</span><span id="camera-age">—</span></figcaption>
+        </figure>
+
+        <article class="drive-card">
+          <div class="drive-heading">
+            <div><p class="eyebrow">HELD DEADMAN</p><h2>Base control</h2></div>
+            <span id="drive-state">HOLDING</span>
+          </div>
+          <label class="speed">Speed <output id="speed-output">70%</output><input id="speed-scale" type="range" min="10" max="100" step="5" value="70"></label>
+          <div class="drive-pad" aria-label="B2W direct drive controls">
+            <button class="drive forward" data-linear="1" data-yaw="0" aria-label="Hold to drive forward">W<small>FORWARD</small></button>
+            <button class="drive left" data-linear="0" data-yaw="1" aria-label="Hold to turn left">A<small>LEFT</small></button>
+            <button id="stop" class="drive stop" aria-label="Stop B2W">STOP<small>HOLD</small></button>
+            <button class="drive right" data-linear="0" data-yaw="-1" aria-label="Hold to turn right">D<small>RIGHT</small></button>
+            <button class="drive reverse" data-linear="-1" data-yaw="0" aria-label="Hold to drive backward">S<small>REVERSE</small></button>
+          </div>
+          <p class="hint"><strong>Press and hold</strong> a direction. On keyboard, hold W/A/S/D directly. Releasing every key or button commands robot-local hold.</p>
+          <button id="release" class="release">End direct session</button>
+        </article>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

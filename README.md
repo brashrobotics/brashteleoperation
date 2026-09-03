@@ -73,6 +73,9 @@ Implemented:
   exact retained observation image, and held-deadman B2W Gazebo driving through
   the loopback-only simulation edge, with a fresh authenticated Gazebo front
   camera view beside the drive controls.
+- Dedicated tokenless, loopback-only B2W Gazebo console with server-side
+  credentials, automatic safe handoff, live camera, and held W/A/S/D controls;
+  it intentionally contains no perception or manipulation workflow.
 - Installable mobile-assistance PWA plus a transport-neutral mobile command core
   that fails closed on backgrounding, screen lock, connection loss, lease
   expiry, deadman release, and process restart.
@@ -121,9 +124,10 @@ B2W stack can also be started from this repository with one command:
 ./scripts/run-b2w-simulation.sh
 ```
 
-The command starts the three healthy Compose services and then keeps Gazebo in
-the foreground. Open `http://127.0.0.1:4310/operator/`; Ctrl-C stops Gazebo but
-leaves the restart-safe Compose services running.
+The command starts the simulation services and then keeps Gazebo in the
+foreground. Open `http://127.0.0.1:4313/` for immediate direct B2W control, or
+`http://127.0.0.1:4310/operator/` for the full assistance interface. Ctrl-C
+stops Gazebo but leaves the restart-safe Compose services running.
 
 `docker compose --env-file .env -f deployment/compose.simulation.yaml up
 --build` starts a frozen-media simulator and seeds an unknown-object request
@@ -151,6 +155,7 @@ verification. It cannot publish physical commands.
 | Area | Component | Responsibility |
 | --- | --- | --- |
 | Operator | [Operator station](apps/operator-station/README.md) | Direct controls, object declaration, plan review, and session status |
+| Operator | [Direct B2W simulator](apps/direct-teleop-simulator/README.md) | Tokenless loopback-only B2W Gazebo driving and live camera |
 | Operator | [Mobile operator application](apps/operator-mobile/README.md) | Mobile lifecycle, native-client roadmap, and installable assistance boundary |
 | Control plane | [Control-plane API](apps/control-plane-api/README.md) | Loopback authenticated session and assistance HTTP API |
 | Development | [Vertical-slice demo](apps/vertical-slice-demo/README.md) | Executable direct-control and unknown-object domain walkthrough |

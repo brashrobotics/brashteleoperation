@@ -47,6 +47,13 @@ measured stopped acknowledgement, then maps accepted X/yaw output only to the
 Gazebo wheel controller. Held input release and the independent edge watchdog
 both command zero.
 
+For a focused interface with no perception/manipulation mode or credential
+fields, open `http://127.0.0.1:4313/`. The `direct-teleop-simulator` container
+keeps development credentials server-side, automatically performs the lease and
+stopped-handoff sequence, and exposes only its bounded camera and direct Gazebo
+control API to the same-origin page. This endpoint is intentionally tokenless,
+simulation-only, and loopback-bound; it must never be exposed on a network.
+
 The media simulator creates a new unknown-object assistance request with a
 frozen synthetic RGB-D observation on startup. Enter
 `http://127.0.0.1:4312` in the console's optional **Media API** field to load

@@ -88,5 +88,40 @@ services:
       timeout: 2s
       retries: 3
 
+  direct-teleop-simulator:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    network_mode: host
+    command: ["npm", "run", "dev:direct"]
+    depends_on:
+      control-plane:
+        condition: service_healthy
+      robot-edge-simulator:
+        condition: service_healthy
+      immutable-media-simulator:
+        condition: service_healthy
+    environment:
+      BRASH_TELEOP_CONTROL_TOKEN: "${BRASH_TELEOP_CONTROL_TOKEN:?set BRASH_TELEOP_CONTROL_TOKEN}"
+      BRASH_TELEOP_EDGE_TOKEN: "${BRASH_TELEOP_EDGE_TOKEN:?set BRASH_TELEOP_EDGE_TOKEN}"
+      BRASH_TELEOP_OPERATOR_ID: "${BRASH_TELEOP_OPERATOR_ID:-operator-001}"
+      BRASH_TELEOP_ROBOT_ID: "b2-unit-001"
+      BRASH_TELEOP_CONTROL_URL: "http://127.0.0.1:4310"
+      BRASH_TELEOP_EDGE_URL: "http://127.0.0.1:4311"
+      BRASH_TELEOP_MEDIA_URL: "http://127.0.0.1:4312"
+      BRASH_DIRECT_TELEOP_HOST: "127.0.0.1"
+      BRASH_DIRECT_TELEOP_PORT: "4313"
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4313/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
 volumes:
   control-state: {}
