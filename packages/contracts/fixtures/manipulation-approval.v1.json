@@ -1,0 +1,11 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "approvalId": "golden-approval-1",
+  "requestId": "golden-assistance-1",
+  "planId": "golden-plan-1",
+  "planRevision": 1,
+  "objectRevision": 1,
+  "sceneRevision": "scene-1",
+  "approvedBy": "operator-001",
+  "approvedAtUnixMs": 1800000000400
+}

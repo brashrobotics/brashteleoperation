@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "apps/**/*.ts",
+    "config/**/*.ts",
+    "edge/**/*.ts",
+    "packages/**/*.ts",
+    "robot/**/*.ts",
+    "services/**/*.ts",
+    "tests/**/*.ts",
+    "workers/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

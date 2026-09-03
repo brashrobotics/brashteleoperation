@@ -1,0 +1,18 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "requestId": "golden-assistance-1",
+  "robotId": "b2-unit-001",
+  "taskId": "pick-task-001",
+  "reason": "OBJECT_NOT_RECOGNIZED",
+  "requestedInput": "SELECT_TARGET",
+  "observations": [{
+    "observationId": "golden-observation-1",
+    "robotId": "b2-unit-001",
+    "capturedAtUnixMs": 1800000000000,
+    "sceneRevision": "scene-1",
+    "calibrationVersion": "calibration-1",
+    "frameIds": ["d435i_color_optical_frame", "d435i_depth_optical_frame"]
+  }],
+  "createdAtUnixMs": 1800000000001,
+  "expiresAtUnixMs": 1800000060000
+}

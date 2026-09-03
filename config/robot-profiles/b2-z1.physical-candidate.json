@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "profileId": "b2-z1-physical-candidate-v1",
+  "lifecycle": "DRAFT",
+  "robot": { "vendor": "Unitree", "baseModel": "B2W", "armModel": "Z1", "identityPattern": "b2-unit-*" },
+  "simulation": false,
+  "commandOutputEnabled": false,
+  "capabilities": { "base": true, "manipulator": true, "gripper": true, "rgbd": true },
+  "baseSafety": {
+    "commandTimeoutMs": null,
+    "maximumLinearXMetersPerSecond": null,
+    "maximumLinearYMetersPerSecond": null,
+    "maximumAngularZRadiansPerSecond": null,
+    "maximumLinearAccelerationMetersPerSecondSquared": null,
+    "maximumAngularAccelerationRadiansPerSecondSquared": null
+  },
+  "manipulationSafety": {
+    "baseMustBeStopped": true,
+    "jointCount": 6,
+    "commandTimeoutMs": null,
+    "maximumJointJogRadiansPerSecond": null,
+    "maximumCartesianLinearMetersPerSecond": null,
+    "maximumCartesianAngularRadiansPerSecond": null,
+    "maximumReachMeters": null,
+    "maximumPositionStdDevMeters": null,
+    "payloadKilograms": null
+  },
+  "frames": { "base": "base_link", "armRoot": "z1_world", "tool": "z1_ee", "rgb": "d435i_color_optical_frame", "depth": "d435i_depth_optical_frame" },
+  "calibrations": { "baseToArm": null, "rgbdIntrinsics": null, "cameraExtrinsics": null },
+  "unresolvedPhysicalMeasurements": [
+    "base command timeout and measured stop response",
+    "base velocity and acceleration envelope",
+    "base_link to z1_world transform",
+    "Z1 joint order, limits, servo rate, and halt response",
+    "gripper range and force mapping",
+    "D435i intrinsics and camera extrinsics",
+    "payload, reach, collision, and stable stance envelope"
+  ]
+}

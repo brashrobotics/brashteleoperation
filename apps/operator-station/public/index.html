@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0c100f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BRASH Operator Station</title>
+    <link rel="manifest" href="/operator/manifest.webmanifest">
+    <link rel="icon" href="/operator/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/operator/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">B</span><div><strong>BRASH</strong><small>Operator station · local development</small></div></div>
+      <div class="connection"><span id="connection-dot" class="dot offline"></span><span id="connection-label">Disconnected</span></div>
+    </header>
+
+    <main>
+      <section class="connect-panel" aria-labelledby="connect-title">
+        <div><p class="eyebrow">Control plane</p><h1 id="connect-title">Human authority, with explicit handoffs.</h1></div>
+        <form id="connect-form" class="connect-form">
+          <label>Operator ID<input id="operator-id" value="operator-001" autocomplete="username" required></label>
+          <label>Development token<input id="bearer-token" type="password" autocomplete="current-password" required></label>
+          <label>Media API (optional)<input id="media-api-url" type="url" inputmode="url" placeholder="http://127.0.0.1:4312" autocomplete="off"></label>
+          <button type="submit">Connect</button>
+        </form>
+      </section>
+
+      <p class="mobile-boundary"><strong>Mobile assistance preview:</strong> this installable console supports low-rate assistance and lease setup. Direct touch-to-motion remains disabled until the authenticated real-time edge channel and lifecycle interlocks are integrated.</p>
+
+      <div id="notice" class="notice" role="status" aria-live="polite">Enter the local development token to load robot work.</div>
+
+      <section class="summary-grid" aria-label="System summary">
+        <article><span>Open assistance</span><strong id="open-count">—</strong></article>
+        <article><span>Active sessions</span><strong id="active-count">—</strong></article>
+        <article><span>Selected robot</span><strong id="selected-robot">None</strong></article>
+        <article class="safety"><span>Motion authority</span><strong>Robot-local</strong></article>
+      </section>
+
+      <nav class="tabs" aria-label="Operator modes">
+        <button class="tab active" data-tab="assistance" aria-selected="true">Assistance inbox</button>
+        <button class="tab" data-tab="direct" aria-selected="false">Direct control setup</button>
+        <button class="tab" data-tab="registry" aria-selected="false">Object knowledge</button>
+        <button class="tab" data-tab="audit" aria-selected="false">Audit trail</button>
+      </nav>
+
+      <section id="assistance-panel" class="workspace tab-panel">
+        <aside class="queue" aria-label="Assistance requests">
+          <div class="section-heading"><div><p class="eyebrow">Queue</p><h2>Robot requests</h2></div><button id="refresh" class="quiet">Refresh</button></div>
+          <div id="request-list" class="request-list"><p class="empty">Connect to load requests.</p></div>
+        </aside>
+        <article class="detail" aria-live="polite">
+          <div id="request-detail" class="empty-state">
+            <div class="reticle" aria-hidden="true"></div>
+            <h2>Select an assistance request</h2>
+            <p>The selected immutable observation and every revision-bound decision will appear here.</p>
+          </div>
+        </article>
+      </section>
+
+      <section id="direct-panel" class="tab-panel hidden">
+        <article class="direct-card">
+          <p class="eyebrow">Direct teleoperation</p><h2>Request a base-control lease</h2>
+          <p>This console creates and grants a short-lived control-plane lease. Robot ownership, safety enablement, and the real-time command channel must still be acknowledged at the edge. This screen cannot bypass them.</p>
+          <form id="direct-session-form" class="stack-form">
+            <label>Robot ID<input id="direct-robot-id" value="b2-unit-001" required></label>
+            <label>Lease duration (seconds)<input id="lease-seconds" type="number" min="5" max="300" value="30" required></label>
+            <button type="submit">Request lease</button>
+          </form>
+          <div id="direct-result" class="result-box">No direct-control lease requested.</div>
+        </article>
+        <article class="direct-card caution">
+          <p class="eyebrow">Safety boundary</p><h2>No browser-to-actuator path</h2>
+          <p>High-rate motion must use the authenticated real-time edge channel with a held deadman, command expiry, sequence checks, and robot-local timeout. The initial HTTP console intentionally stops at lease setup.</p>
+        </article>
+      </section>
+
+      <section id="registry-panel" class="tab-panel hidden">
+        <article class="audit-card"><div class="section-heading"><div><p class="eyebrow">Reviewed knowledge</p><h2>Object registry</h2></div></div><p class="panel-copy">This view is read-only. Candidate review, evaluation, activation, and rollback require separately authorized roles.</p><div id="registry-list" class="table-wrap"><p class="empty">Connect to load registry versions.</p></div></article>
+      </section>
+
+      <section id="audit-panel" class="tab-panel hidden">
+        <article class="audit-card"><div class="section-heading"><div><p class="eyebrow">Recent state</p><h2>Sessions</h2></div></div><div id="session-list" class="table-wrap"><p class="empty">Connect to load sessions.</p></div></article>
+      </section>
+    </main>
+
+    <template id="request-template">
+      <button class="request-item"><span class="request-status"></span><strong class="request-reason"></strong><small class="request-meta"></small></button>
+    </template>
+    <script type="module" src="/operator/app.js"></script>
+  </body>
+</html>

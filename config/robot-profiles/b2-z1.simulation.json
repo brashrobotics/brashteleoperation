@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "profileId": "b2-z1-sim-v1",
+  "lifecycle": "SIMULATION_VALIDATED",
+  "robot": { "vendor": "Unitree", "baseModel": "B2W", "armModel": "Z1", "identityPattern": "sim-b2-z1-*" },
+  "simulation": true,
+  "commandOutputEnabled": true,
+  "capabilities": { "base": true, "manipulator": true, "gripper": true, "rgbd": true },
+  "baseSafety": {
+    "commandTimeoutMs": 250,
+    "maximumLinearXMetersPerSecond": 0.7,
+    "maximumLinearYMetersPerSecond": 0.4,
+    "maximumAngularZRadiansPerSecond": 0.7,
+    "maximumLinearAccelerationMetersPerSecondSquared": 0.5,
+    "maximumAngularAccelerationRadiansPerSecondSquared": 0.7
+  },
+  "manipulationSafety": {
+    "baseMustBeStopped": true,
+    "jointCount": 6,
+    "commandTimeoutMs": 200,
+    "maximumJointJogRadiansPerSecond": [0.5, 0.5, 0.5, 0.7, 0.7, 0.7],
+    "maximumCartesianLinearMetersPerSecond": 0.12,
+    "maximumCartesianAngularRadiansPerSecond": 0.4,
+    "maximumReachMeters": 0.9,
+    "maximumPositionStdDevMeters": 0.04,
+    "payloadKilograms": 1.0
+  },
+  "frames": { "base": "base_link", "armRoot": "z1_world", "tool": "z1_ee", "rgb": "d435i_color_optical_frame", "depth": "d435i_depth_optical_frame" },
+  "calibrations": { "baseToArm": "sim-base-z1-v1", "rgbdIntrinsics": "sim-d435i-intrinsics-v1", "cameraExtrinsics": "sim-d435i-extrinsics-v1" },
+  "unresolvedPhysicalMeasurements": []
+}

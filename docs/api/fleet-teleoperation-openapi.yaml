@@ -1,0 +1,132 @@
+openapi: 3.1.0
+info:
+  title: BRASH Fleet Teleoperation Hold API
+  version: 1.0.0
+  description: >-
+    Low-rate contract required from BRASH Fleet Control for mission hold and
+    robot-stopped handoff. This API never transports motion commands or media.
+servers:
+  - url: https://fleet.example
+security:
+  - serviceBearer: []
+paths:
+  /api/v1/teleoperation/holds:
+    post:
+      operationId: requestTeleoperationHold
+      description: >-
+        Idempotently requests a hold using requestId as both the semantic
+        idempotency key and the Idempotency-Key header value.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HoldRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/HoldResponse" }
+        "201": { $ref: "#/components/responses/HoldResponse" }
+        "401": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/teleoperation/holds/{holdId}:
+    parameters:
+      - $ref: "#/components/parameters/HoldId"
+    get:
+      operationId: inspectTeleoperationHold
+      responses:
+        "200": { $ref: "#/components/responses/HoldResponse" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/teleoperation/holds/{holdId}/release:
+    parameters:
+      - $ref: "#/components/parameters/HoldId"
+      - $ref: "#/components/parameters/IdempotencyKey"
+    post:
+      operationId: releaseTeleoperationHold
+      description: >-
+        Releases mission ownership only after teleoperation has ended and the
+        robot edge has acknowledged stopped command ownership.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReleaseRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/HoldResponse" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    serviceBearer: { type: http, scheme: bearer }
+  parameters:
+    HoldId:
+      name: holdId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 300 }
+  schemas:
+    ContractVersion:
+      type: object
+      additionalProperties: false
+      required: [major, minor]
+      properties:
+        major: { type: integer, const: 1 }
+        minor: { type: integer, minimum: 0 }
+    HoldRequest:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, requestId, robotId, reason]
+      properties:
+        contractVersion: { $ref: "#/components/schemas/ContractVersion" }
+        requestId: { type: string, minLength: 1, maxLength: 128 }
+        robotId: { type: string, minLength: 1, maxLength: 128 }
+        missionId: { type: string, minLength: 1, maxLength: 128 }
+        reason: { type: string, minLength: 1, maxLength: 1024 }
+    ReleaseRequest:
+      type: object
+      additionalProperties: false
+      required: [contractVersion, expectedRevision, reason]
+      properties:
+        contractVersion: { $ref: "#/components/schemas/ContractVersion" }
+        expectedRevision: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 1024 }
+    FleetHold:
+      type: object
+      additionalProperties: false
+      required: [holdId, robotId, state, revision]
+      properties:
+        holdId: { type: string, minLength: 1, maxLength: 128 }
+        robotId: { type: string, minLength: 1, maxLength: 128 }
+        missionId: { type: string, minLength: 1, maxLength: 128 }
+        state: { enum: [PAUSE_REQUESTED, ROBOT_STOPPED, REJECTED, RELEASED] }
+        reason: { type: string, minLength: 1, maxLength: 1024 }
+        revision: { type: integer, minimum: 1 }
+    FleetHoldDocument:
+      type: object
+      required: [contractVersion, hold]
+      properties:
+        contractVersion: { $ref: "#/components/schemas/ContractVersion" }
+        hold: { $ref: "#/components/schemas/FleetHold" }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+  responses:
+    HoldResponse:
+      description: Current hold state
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/FleetHoldDocument" }
+    Error:
+      description: Typed Fleet error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

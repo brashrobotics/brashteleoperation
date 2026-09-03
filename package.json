@@ -1,0 +1,23 @@
+{
+  "name": "brash-teleoperation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "demo": "node apps/vertical-slice-demo/src/main.ts",
+    "demo:autonomy": "node apps/interactive-autonomy-demo/src/main.ts",
+    "dev:control": "node apps/control-plane-api/src/dev.ts",
+    "dev:edge": "node edge/robot-agent/src/dev.ts",
+    "dev:media": "node edge/media-gateway/src/dev.ts",
+    "test": "node --test tests/contract/contracts.test.ts tests/contract/robot-profiles.test.ts tests/contract/signed-leases.test.ts tests/contract/observability.test.ts tests/contract/identity.test.ts tests/contract/mobile-operator-core.test.ts tests/contract/operator-pwa-assets.test.ts tests/integration/session-assistance.test.ts tests/integration/persistence-recovery.test.ts tests/integration/object-learning.test.ts tests/integration/fleet-handoff.test.ts tests/integration/fleet-http-adapter.test.ts tests/integration/robot-readiness.test.ts tests/integration/robot-readiness-reporter.test.ts tests/integration/learning-pipeline.test.ts tests/integration/recognition-assistance-coordinator.test.ts tests/integration/mobile-command-edge.test.ts tests/integration/realtime-signaling.test.ts tests/integration/realtime-signaling-persistence.test.ts tests/failure/stale-inputs.test.ts tests/failure/safety-supervisor.test.ts tests/failure/local-agent.test.ts tests/failure/media-gateway.test.ts tests/failure/realtime-channel.test.ts tests/failure/manipulator-safety.test.ts tests/simulation/vertical-slice.test.ts tests/simulation/perception-manipulation.test.ts tests/simulation/ros-boundary.test.ts tests/simulation/future-recognition.test.ts tests/simulation/interactive-autonomy-loop.test.ts tests/e2e/network-stack.test.ts tests/e2e/control-api-boundaries.test.ts tests/e2e/signaling-api.test.ts tests/e2e/fleet-admission-api.test.ts tests/e2e/robot-readiness-api.test.ts tests/e2e/signed-lease-api.test.ts tests/e2e/media-gateway-api.test.ts tests/e2e/simulation-assistance-worker-api.test.ts tests/e2e/process-restart.test.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,15 @@
+groups:
+  - name: brash-teleoperation-control-plane
+    rules:
+      - alert: BrashAssistanceBacklog
+        expr: brash_teleoperation_assistance_requests{terminal="false"} > 10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Human-assistance backlog is elevated
+      - alert: BrashControlPlaneApiErrors
+        expr: sum(rate(brash_teleoperation_http_requests_total{status=~"5.."}[5m])) > 0.1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Teleoperation control-plane API is returning errors

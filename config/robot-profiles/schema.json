@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brashrobotics.dev/schemas/teleoperation-robot-profile-v1.json",
+  "title": "BRASH Teleoperation Robot Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profileId", "lifecycle", "robot", "simulation", "commandOutputEnabled", "capabilities", "baseSafety", "manipulationSafety", "frames", "calibrations", "unresolvedPhysicalMeasurements"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "profileId": { "type": "string", "minLength": 1 },
+    "lifecycle": { "enum": ["DRAFT", "SIMULATION_VALIDATED", "OBSERVE_ONLY_VALIDATED", "RESTRICTED_LAB", "PRODUCTION_APPROVED"] },
+    "robot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vendor", "baseModel", "armModel", "identityPattern"],
+      "properties": {
+        "vendor": { "type": "string", "minLength": 1 },
+        "baseModel": { "type": "string", "minLength": 1 },
+        "armModel": { "type": "string", "minLength": 1 },
+        "identityPattern": { "type": "string", "minLength": 1 }
+      }
+    },
+    "simulation": { "type": "boolean" },
+    "commandOutputEnabled": { "type": "boolean" },
+    "capabilities": {
+      "type": "object",
+      "required": ["base", "manipulator", "gripper", "rgbd"],
+      "properties": { "base": { "type": "boolean" }, "manipulator": { "type": "boolean" }, "gripper": { "type": "boolean" }, "rgbd": { "type": "boolean" } }
+    },
+    "baseSafety": {
+      "type": "object",
+      "required": ["commandTimeoutMs", "maximumLinearXMetersPerSecond", "maximumLinearYMetersPerSecond", "maximumAngularZRadiansPerSecond", "maximumLinearAccelerationMetersPerSecondSquared", "maximumAngularAccelerationRadiansPerSecondSquared"],
+      "additionalProperties": false,
+      "properties": {
+        "commandTimeoutMs": { "type": ["integer", "null"], "minimum": 1 },
+        "maximumLinearXMetersPerSecond": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "maximumLinearYMetersPerSecond": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "maximumAngularZRadiansPerSecond": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "maximumLinearAccelerationMetersPerSecondSquared": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "maximumAngularAccelerationRadiansPerSecondSquared": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      }
+    },
+    "manipulationSafety": {
+      "type": "object",
+      "required": ["baseMustBeStopped", "jointCount", "commandTimeoutMs", "maximumJointJogRadiansPerSecond", "maximumCartesianLinearMetersPerSecond", "maximumCartesianAngularRadiansPerSecond", "maximumReachMeters", "maximumPositionStdDevMeters", "payloadKilograms"],
+      "additionalProperties": false,
+      "properties": {
+        "baseMustBeStopped": { "const": true },
+        "jointCount": { "type": "integer", "minimum": 1 },
+        "commandTimeoutMs": { "type": ["integer", "null"], "minimum": 1 },
+        "maximumJointJogRadiansPerSecond": { "type": ["array", "null"], "items": { "type": "number", "exclusiveMinimum": 0 } },
+        "maximumCartesianLinearMetersPerSecond": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "maximumCartesianAngularRadiansPerSecond": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "maximumReachMeters": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "maximumPositionStdDevMeters": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "payloadKilograms": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      }
+    },
+    "frames": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
+    "calibrations": { "type": "object", "additionalProperties": { "type": ["string", "null"] } },
+    "unresolvedPhysicalMeasurements": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "physicalCommandApprovalId": { "type": "string", "minLength": 1 }
+  }
+}

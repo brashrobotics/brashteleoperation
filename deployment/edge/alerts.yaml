@@ -1,0 +1,15 @@
+groups:
+  - name: brash-teleoperation-edge
+    rules:
+      - alert: BrashEdgeUnexpectedMotionOutput
+        expr: brash_teleoperation_edge_output_active == 1 and on(actuator_group) brash_teleoperation_edge_safety_enabled == 0
+        for: 0m
+        labels: { severity: critical }
+        annotations:
+          summary: Nonzero edge output observed while safety is not enabled
+      - alert: BrashEdgeApiErrors
+        expr: sum(rate(brash_teleoperation_edge_http_requests_total{status=~"5.."}[5m])) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: Robot-edge development transport is returning errors

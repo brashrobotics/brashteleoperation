@@ -1,0 +1,152 @@
+openapi: 3.1.0
+info:
+  title: BRASH Robot-Agent Test API
+  version: 0.1.0
+  description: Loopback simulation/test transport. It is not the production real-time command transport and cannot command physical hardware.
+servers:
+  - url: http://127.0.0.1:4311
+security:
+  - developmentBearer: []
+paths:
+  /health:
+    get:
+      security: []
+      operationId: getEdgeHealth
+      responses: { "200": { description: Test transport is live } }
+  /metrics:
+    get:
+      operationId: getEdgeMetrics
+      responses: { "200": { description: Prometheus text metrics } }
+  /edge/v1/state:
+    get:
+      operationId: getEdgeState
+      responses: { "200": { description: Lease, ownership, and safety state } }
+  /edge/v1/leases:
+    post:
+      operationId: installDevelopmentLease
+      description: Disabled when the agent is configured to require signed leases.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lease]
+              properties:
+                lease: { $ref: "../../packages/contracts/schemas/canonical-contracts.schema.json#/$defs/teleopSessionLease" }
+      responses: { "200": { description: Lease installed }, "400": { $ref: "#/components/responses/Error" } }
+  /edge/v1/signed-leases:
+    post:
+      operationId: installSignedLease
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [signedLease], properties: { signedLease: { type: object } } }
+      responses: { "200": { description: Verified lease installed }, "400": { $ref: "#/components/responses/Error" } }
+  /edge/v1/leases/{sessionId}/revoke:
+    parameters: [{ name: sessionId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: revokeEdgeLease
+      requestBody: { $ref: "#/components/requestBodies/Reason" }
+      responses: { "200": { description: Lease revoked and matching ownership stopped } }
+  /edge/v1/ownership/request:
+    post:
+      operationId: requestOwnership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, actuatorGroup]
+              properties:
+                sessionId: { type: string }
+                actuatorGroup: { enum: [BASE, MANIPULATOR] }
+      responses: { "200": { description: Ownership handoff started }, "409": { $ref: "#/components/responses/Error" } }
+  /edge/v1/ownership/stopped-ack:
+    post:
+      operationId: acknowledgeStoppedOwnership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedRevision, evidence]
+              properties:
+                expectedRevision: { type: integer, minimum: 1 }
+                evidence:
+                  type: object
+                  additionalProperties: false
+                  required: [observedAtUnixMs, controllerStateFresh, baseStopped, manipulatorHolding]
+                  properties:
+                    observedAtUnixMs: { type: integer, minimum: 0 }
+                    controllerStateFresh: { type: boolean }
+                    baseStopped: { type: boolean }
+                    manipulatorHolding: { type: boolean }
+      responses: { "200": { description: Stopped handoff acknowledged }, "400": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /edge/v1/ownership/release:
+    post:
+      operationId: releaseOwnership
+      requestBody: { $ref: "#/components/requestBodies/RevisionedReason" }
+      responses: { "200": { description: Ownership moved to stopped handoff } }
+  /edge/v1/safety/interlocks:
+    post:
+      operationId: updateBaseInterlocks
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Base interlocks updated } }
+  /edge/v1/safety/{action}:
+    parameters: [{ name: action, in: path, required: true, schema: { enum: [prepare, enable, hold] } }]
+    post:
+      operationId: transitionBaseSafety
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [expectedRevision], properties: { expectedRevision: { type: integer, minimum: 1 }, reason: { type: string } } } } } }
+      responses: { "200": { description: Base safety transitioned }, "409": { $ref: "#/components/responses/Error" } }
+  /edge/v1/manipulator-safety/interlocks:
+    post:
+      operationId: updateManipulatorInterlocks
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Manipulator interlocks updated } }
+  /edge/v1/manipulator-safety/{action}:
+    parameters: [{ name: action, in: path, required: true, schema: { enum: [prepare, enable, hold] } }]
+    post:
+      operationId: transitionManipulatorSafety
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [expectedRevision], properties: { expectedRevision: { type: integer, minimum: 1 }, reason: { type: string } } } } } }
+      responses: { "200": { description: Manipulator safety transitioned }, "409": { $ref: "#/components/responses/Error" } }
+  /edge/v1/commands:
+    post:
+      operationId: submitTestCommand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command: { $ref: "../../packages/contracts/schemas/canonical-contracts.schema.json#/$defs/teleopCommandEnvelope" }
+      responses: { "200": { description: Command accepted by arbiter and safety supervisor }, "400": { $ref: "#/components/responses/Error" } }
+  /edge/v1/tick:
+    post:
+      operationId: forceWatchdogTick
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { "200": { description: Watchdogs evaluated } }
+components:
+  securitySchemes:
+    developmentBearer: { type: http, scheme: bearer }
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties: { code: { type: string }, message: { type: string }, details: { type: object } }
+  requestBodies:
+    Reason:
+      required: true
+      content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } }
+    RevisionedReason:
+      required: true
+      content: { application/json: { schema: { type: object, required: [expectedRevision, reason], properties: { expectedRevision: { type: integer, minimum: 1 }, reason: { type: string } } } } }
+  responses:
+    Error:
+      description: Typed domain or validation error
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

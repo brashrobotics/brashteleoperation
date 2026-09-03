@@ -1,0 +1,14 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "declarationId": "golden-declaration-1",
+  "requestId": "golden-assistance-1",
+  "observationId": "golden-observation-1",
+  "revision": 1,
+  "declaredBy": "operator-001",
+  "declaredAtUnixMs": 1800000000100,
+  "selection": { "kind": "BOX", "frameId": "d435i_color_optical_frame", "x": 320, "y": 220, "width": 80, "height": 110 },
+  "semanticLabel": "blue parts bin",
+  "manipulationIntent": "PICK",
+  "persistenceScope": "SITE_ENROLLMENT_CANDIDATE",
+  "graspHint": { "frameId": "base_link", "approachVector": [0, 0, -1] }
+}

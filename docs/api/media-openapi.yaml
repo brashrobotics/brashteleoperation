@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: BRASH Immutable Observation Media API
+  version: 0.1.0
+  description: Simulation/test adapter for retrieving the exact frozen RGB frame used by an object declaration. This is not the live production media transport and has no actuator operation.
+servers:
+  - url: http://127.0.0.1:4312
+paths:
+  /health:
+    get:
+      operationId: getMediaHealth
+      responses:
+        "200": { description: Service is live }
+  /media/v1/observations/{observationId}/access:
+    parameters:
+      - { name: observationId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    post:
+      operationId: createObservationMediaGrant
+      description: Authenticates an operator, applies assignment/policy authorization, and creates a short-lived observation- and camera-scoped media grant.
+      security: [{ operatorBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [lifetimeMs]
+              properties:
+                lifetimeMs: { type: integer, minimum: 1000, maximum: 300000 }
+      responses:
+        "201":
+          description: Short-lived media grant
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [accessToken, grant]
+                properties:
+                  accessToken: { type: string, minLength: 1, writeOnly: true }
+                  grant: { $ref: "#/components/schemas/MediaAccessClaims" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /media/v1/observations/{observationId}/preview:
+    parameters:
+      - { name: observationId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    get:
+      operationId: getImmutableObservationPreview
+      description: Returns the retained RGB bytes after media-grant scope and stored SHA-256 integrity checks. Provenance is returned in x-brash-* headers.
+      security: [{ mediaGrant: [] }]
+      responses:
+        "200":
+          description: Exact retained RGB frame
+          headers:
+            x-brash-observation-id: { schema: { type: string } }
+            x-brash-frame-id: { schema: { type: string } }
+            x-brash-sensor-frame-id: { schema: { type: string } }
+            x-brash-frame-sha256: { schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+            x-brash-source-timestamp-unix-ms: { schema: { type: integer, minimum: 0 } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+            image/avif: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /media/v1/observations/{observationId}/frames/{frameId}:
+    parameters:
+      - { name: observationId, in: path, required: true, schema: { type: string, minLength: 1 } }
+      - { name: frameId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    get:
+      operationId: getImmutableObservationFrame
+      description: Retrieves an explicitly identified retained image frame using the same scoped grant and integrity checks as preview.
+      security: [{ mediaGrant: [] }]
+      responses:
+        "200": { description: Exact retained image frame }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    operatorBearer: { type: http, scheme: bearer }
+    mediaGrant: { type: http, scheme: bearer }
+  schemas:
+    MediaAccessClaims:
+      type: object
+      additionalProperties: false
+      required: [operatorId, robotId, cameraIds, resource, observationIds, scope, issuedAtUnixMs, expiresAtUnixMs, nonce]
+      properties:
+        operatorId: { type: string, minLength: 1 }
+        robotId: { type: string, minLength: 1 }
+        cameraIds: { type: array, minItems: 1, uniqueItems: true, items: { type: string, minLength: 1 } }
+        resource: { const: IMMUTABLE_OBSERVATION }
+        observationIds: { type: array, minItems: 1, uniqueItems: true, items: { type: string, minLength: 1 } }
+        scope: { const: OBSERVE }
+        issuedAtUnixMs: { type: integer, minimum: 0 }
+        expiresAtUnixMs: { type: integer, minimum: 0 }
+        nonce: { type: string, minLength: 1 }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object }
+  responses:
+    Error:
+      description: Typed error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

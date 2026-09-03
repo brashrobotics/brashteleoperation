@@ -1,0 +1,187 @@
+openapi: 3.1.0
+info:
+  title: BRASH Teleoperation Control API
+  version: 0.1.0
+  description: Low-rate session, assistance, WebRTC signaling, and reviewed object-registry API. Motion commands are deliberately excluded.
+servers:
+  - url: http://127.0.0.1:4310
+security:
+  - developmentBearer: []
+paths:
+  /health:
+    get:
+      security: []
+      operationId: getHealth
+      responses: { "200": { description: Service is live } }
+  /metrics:
+    get:
+      operationId: getMetrics
+      responses: { "200": { description: Prometheus text metrics } }
+  /control/v1/sessions:
+    get:
+      operationId: listSessions
+      responses: { "200": { description: Session snapshots } }
+    post:
+      operationId: requestSession
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SessionRequest" } } } }
+      responses: { "201": { description: Session requested }, "400": { $ref: "#/components/responses/Error" } }
+  /control/v1/sessions/{sessionId}/{action}:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+      - { name: action, in: path, required: true, schema: { enum: [grant, connecting, activate, renew, hold, release, revoke] } }
+    post:
+      operationId: transitionSession
+      description: Commanding activate/release transitions derive ownership state from the latest authenticated robot-readiness report; client boolean claims cannot satisfy the gate.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [expectedRevision], properties: { expectedRevision: { type: integer, minimum: 1 } }, additionalProperties: true } } } }
+      responses: { "200": { description: Updated session }, "409": { $ref: "#/components/responses/Error" } }
+  /control/v1/sessions/{sessionId}/robot-readiness:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getRobotSessionReadiness
+      responses: { "200": { description: Latest authenticated robot readiness }, "404": { $ref: "#/components/responses/Error" } }
+    post:
+      operationId: reportRobotSessionReadiness
+      description: Accepts a short-lived report only from the robot principal bound to the session robot ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [report]
+              properties:
+                report: { $ref: "../../packages/contracts/schemas/canonical-contracts.schema.json#/$defs/robotSessionReadinessReport" }
+      responses: { "200": { description: Readiness recorded }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /control/v1/sessions/{sessionId}/signed-lease:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getSignedSessionLease
+      description: Returns a fresh signature over the current live lease to its bound operator when lease signing is configured.
+      responses:
+        "200":
+          description: Signed lease envelope
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [signedLease]
+                properties:
+                  signedLease: { $ref: "../../packages/contracts/schemas/canonical-contracts.schema.json#/$defs/signedTeleopSessionLease" }
+        "403": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
+  /assistance/v1/requests:
+    get:
+      operationId: listAssistanceRequests
+      description: Operators see authorized workflows. A robot principal sees only requests bound to its exact robot identity.
+      responses: { "200": { description: Assistance snapshots } }
+    post:
+      operationId: openAssistanceRequest
+      description: Robot callers may open requests only for their exact authenticated robot identity.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "../../packages/contracts/schemas/canonical-contracts.schema.json#/$defs/assistanceRequest" } } } }
+      responses: { "201": { description: Assistance request opened } }
+  /assistance/v1/requests/{requestId}:
+    parameters:
+      - { name: requestId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getAssistanceRequest
+      description: Returns one authorized workflow. Robot callers must match the request robot identity exactly.
+      responses: { "200": { description: Assistance snapshot }, "403": { $ref: "#/components/responses/Error" } }
+  /assistance/v1/requests/{requestId}/events:
+    parameters:
+      - { name: requestId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getAssistanceEvents
+      description: Returns workflow events to an authorized operator or the exact bound robot.
+      responses: { "200": { description: Assistance events }, "403": { $ref: "#/components/responses/Error" } }
+  /assistance/v1/requests/{requestId}/{action}:
+    parameters:
+      - { name: requestId, in: path, required: true, schema: { type: string } }
+      - { name: action, in: path, required: true, schema: { enum: [assign, declarations, declaration-correction, groundings, plans, approvals, outcomes, verification, direct-teleop] } }
+    post:
+      operationId: transitionAssistance
+      description: Operator and robot actions are permission-separated. Robot machine transitions must match the request robot identity.
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [expectedRevision], properties: { expectedRevision: { type: integer, minimum: 1 } }, additionalProperties: true } } } }
+      responses: { "200": { description: Updated assistance workflow }, "409": { $ref: "#/components/responses/Error" } }
+  /signaling/v1/exchanges:
+    post:
+      operationId: createSignalingExchange
+      description: Creates one short-lived WebRTC signaling exchange bound to an already granted session and its operator/robot identities.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SignalingExchangeRequest" } } } }
+      responses: { "201": { description: Signaling exchange created }, "409": { $ref: "#/components/responses/Error" } }
+  /signaling/v1/exchanges/{signalingId}:
+    parameters:
+      - { name: signalingId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getSignalingExchange
+      description: Returns the active exchange only to its bound operator or robot edge.
+      responses: { "200": { description: Signaling exchange }, "403": { $ref: "#/components/responses/Error" } }
+  /signaling/v1/exchanges/{signalingId}/messages:
+    parameters:
+      - { name: signalingId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: submitSignalingMessage
+      description: Exchanges bounded SDP/ICE metadata. This endpoint cannot activate a session, grant ownership, or carry motion commands.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SignalingMessageRequest" } } } }
+      responses: { "200": { description: Updated signaling exchange }, "403": { $ref: "#/components/responses/Error" }, "409": { $ref: "#/components/responses/Error" } }
+  /signaling/v1/exchanges/{signalingId}/events:
+    parameters:
+      - { name: signalingId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getSignalingEvents
+      description: Returns payload-free signaling audit events to a bound peer.
+      responses: { "200": { description: Signaling events }, "403": { $ref: "#/components/responses/Error" } }
+  /registry/v1/versions:
+    get:
+      operationId: listRegistryVersions
+      parameters: [{ name: objectClassId, in: query, schema: { type: string } }]
+      responses: { "200": { description: Registry versions } }
+    post:
+      operationId: createRegistryCandidate
+      responses: { "201": { description: Candidate created }, "400": { $ref: "#/components/responses/Error" } }
+  /registry/v1/versions/{versionId}/{action}:
+    parameters:
+      - { name: versionId, in: path, required: true, schema: { type: string } }
+      - { name: action, in: path, required: true, schema: { enum: [submit-review, reviews, start-validation, validations, activate, rollback] } }
+    post:
+      operationId: transitionRegistryVersion
+      description: Validation requests include artifactSha256 so activation and robot installation remain bound to the evaluated bytes.
+      responses: { "200": { description: Updated registry version }, "409": { $ref: "#/components/responses/Error" } }
+components:
+  securitySchemes:
+    developmentBearer: { type: http, scheme: bearer }
+  schemas:
+    SessionRequest:
+      type: object
+      additionalProperties: false
+      required: [robotId, operatorId, scopes]
+      properties:
+        sessionId: { type: string }
+        robotId: { type: string, minLength: 1 }
+        operatorId: { type: string, minLength: 1 }
+        scopes: { type: array, minItems: 1, uniqueItems: true, items: { $ref: "../../packages/contracts/schemas/canonical-contracts.schema.json#/$defs/sessionScope" } }
+    SignalingExchangeRequest:
+      type: object
+      additionalProperties: false
+      required: [sessionId]
+      properties:
+        signalingId: { type: string, minLength: 1 }
+        sessionId: { type: string, minLength: 1 }
+    SignalingMessageRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, message]
+      properties:
+        expectedRevision: { type: integer, minimum: 1 }
+        message: { $ref: "../../packages/contracts/schemas/canonical-contracts.schema.json#/$defs/realtimeSignalingMessage" }
+    Error:
+      type: object
+      required: [code, message]
+      properties: { code: { type: string }, message: { type: string }, details: { type: object } }
+  responses:
+    Error:
+      description: Typed domain or validation error
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

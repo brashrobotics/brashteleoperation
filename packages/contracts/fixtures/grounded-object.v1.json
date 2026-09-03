@@ -1,0 +1,18 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "objectId": "golden-object-1",
+  "requestId": "golden-assistance-1",
+  "declarationId": "golden-declaration-1",
+  "declarationRevision": 1,
+  "observationId": "golden-observation-1",
+  "robotId": "b2-unit-001",
+  "sceneRevision": "scene-1",
+  "revision": 1,
+  "status": "TRACKED",
+  "pose": { "frameId": "base_link", "positionMeters": [0.55, 0.02, 0.3], "orientationXyzw": [0, 0, 0, 1] },
+  "dimensionsMeters": [0.12, 0.1, 0.18],
+  "positionStdDevMeters": [0.004, 0.004, 0.006],
+  "groundedAtUnixMs": 1800000000200,
+  "validUntilUnixMs": 1800000030200,
+  "algorithm": { "name": "brash-deterministic-rgbd-grounder", "version": "0.1.0" }
+}

@@ -1,0 +1,14 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "planId": "golden-plan-1",
+  "requestId": "golden-assistance-1",
+  "robotId": "b2-unit-001",
+  "objectId": "golden-object-1",
+  "objectRevision": 1,
+  "sceneRevision": "scene-1",
+  "planRevision": 1,
+  "generatedAtUnixMs": 1800000000300,
+  "approvalRequired": true,
+  "phases": ["approach", "grasp", "lift", "verify"],
+  "expectedOutcome": "Target remains secured after a simulated lift."
+}

@@ -1,0 +1,20 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "commandId": "golden-arm-command-1",
+  "sessionId": "golden-session-1",
+  "robotId": "b2-unit-001",
+  "sourceId": "operator-001",
+  "actuatorGroup": "MANIPULATOR",
+  "sequence": 8,
+  "producedAtUnixMs": 1800000000000,
+  "expiresAtUnixMs": 1800000000200,
+  "deadman": true,
+  "intent": {
+    "kind": "ARM_MOTION",
+    "mode": "JOINT_JOG",
+    "frameId": "z1_world",
+    "values": [0.1, 0, 0, 0, 0, 0],
+    "speedScale": 0.25,
+    "clutch": true
+  }
+}

@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brashrobotics.dev/schemas/teleoperation-contracts-v1.json",
+  "title": "BRASH Teleoperation Canonical Contracts v1",
+  "$defs": {
+    "contractVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["major", "minor"],
+      "properties": { "major": { "const": 1 }, "minor": { "type": "integer", "minimum": 0 } }
+    },
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "unixMs": { "type": "integer", "minimum": 0 },
+    "positiveRevision": { "type": "integer", "minimum": 1 },
+    "vector3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }]
+    },
+    "vector4": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }, { "type": "number" }]
+    },
+    "sessionScope": { "enum": ["OBSERVE", "DECLARE_OBJECT", "APPROVE_PLAN", "CONTROL_BASE", "CONTROL_MANIPULATOR", "SUPERVISE"] },
+    "teleopSessionLease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "sessionId", "robotId", "operatorId", "scopes", "revision", "issuedAtUnixMs", "expiresAtUnixMs"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" },
+        "sessionId": { "$ref": "#/$defs/nonEmptyString" },
+        "robotId": { "$ref": "#/$defs/nonEmptyString" },
+        "operatorId": { "$ref": "#/$defs/nonEmptyString" },
+        "scopes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sessionScope" } },
+        "revision": { "$ref": "#/$defs/positiveRevision" },
+        "issuedAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "expiresAtUnixMs": { "$ref": "#/$defs/unixMs" }
+      }
+    },
+    "signedTeleopSessionLease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "keyId", "lease", "signature"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "keyId": { "$ref": "#/$defs/nonEmptyString" },
+        "lease": { "$ref": "#/$defs/teleopSessionLease" },
+        "signature": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "robotSessionReadinessReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "readinessId", "sessionId", "robotId", "operatorId", "leaseRevision", "ownershipRevision", "ownershipStatus", "reportedAtUnixMs"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" },
+        "readinessId": { "$ref": "#/$defs/nonEmptyString" },
+        "sessionId": { "$ref": "#/$defs/nonEmptyString" },
+        "robotId": { "$ref": "#/$defs/nonEmptyString" },
+        "operatorId": { "$ref": "#/$defs/nonEmptyString" },
+        "leaseRevision": { "$ref": "#/$defs/positiveRevision" },
+        "ownershipRevision": { "$ref": "#/$defs/positiveRevision" },
+        "ownershipStatus": { "enum": ["NO_OWNER", "HANDOFF", "OWNED"] },
+        "actuatorGroup": { "enum": ["BASE", "MANIPULATOR"] },
+        "reportedAtUnixMs": { "$ref": "#/$defs/unixMs" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "ownershipStatus": { "enum": ["HANDOFF", "OWNED"] } } },
+          "then": { "required": ["actuatorGroup"] }
+        },
+        {
+          "if": { "properties": { "ownershipStatus": { "const": "NO_OWNER" } } },
+          "then": { "not": { "required": ["actuatorGroup"] } }
+        }
+      ]
+    },
+    "baseMotionIntent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "frameId", "linearXMetersPerSecond", "linearYMetersPerSecond", "angularZRadiansPerSecond", "speedScale"],
+      "properties": {
+        "kind": { "const": "BASE_MOTION" },
+        "frameId": { "$ref": "#/$defs/nonEmptyString" },
+        "linearXMetersPerSecond": { "type": "number" },
+        "linearYMetersPerSecond": { "type": "number" },
+        "angularZRadiansPerSecond": { "type": "number" },
+        "speedScale": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "armMotionIntent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "mode", "frameId", "values", "speedScale", "clutch"],
+      "properties": {
+        "kind": { "const": "ARM_MOTION" },
+        "mode": { "enum": ["CARTESIAN_TWIST", "JOINT_JOG"] },
+        "frameId": { "$ref": "#/$defs/nonEmptyString" },
+        "values": { "type": "array", "minItems": 1, "items": { "type": "number" } },
+        "speedScale": { "type": "number", "minimum": 0, "maximum": 1 },
+        "clutch": { "type": "boolean" }
+      },
+      "allOf": [
+        { "if": { "properties": { "mode": { "const": "CARTESIAN_TWIST" } } }, "then": { "properties": { "values": { "minItems": 6, "maxItems": 6 } } } }
+      ]
+    },
+    "gripperIntent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "normalizedPosition"],
+      "properties": {
+        "kind": { "const": "GRIPPER" },
+        "normalizedPosition": { "type": "number", "minimum": 0, "maximum": 1 },
+        "normalizedForceLimit": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "teleopCommandEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "commandId", "sessionId", "robotId", "sourceId", "actuatorGroup", "sequence", "producedAtUnixMs", "expiresAtUnixMs", "deadman", "intent"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" },
+        "commandId": { "$ref": "#/$defs/nonEmptyString" },
+        "sessionId": { "$ref": "#/$defs/nonEmptyString" },
+        "robotId": { "$ref": "#/$defs/nonEmptyString" },
+        "sourceId": { "$ref": "#/$defs/nonEmptyString" },
+        "actuatorGroup": { "enum": ["BASE", "MANIPULATOR"] },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "producedAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "expiresAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "deadman": { "type": "boolean" },
+        "intent": { "oneOf": [{ "$ref": "#/$defs/baseMotionIntent" }, { "$ref": "#/$defs/armMotionIntent" }, { "$ref": "#/$defs/gripperIntent" }] }
+      },
+      "allOf": [
+        { "if": { "properties": { "actuatorGroup": { "const": "BASE" } } }, "then": { "properties": { "intent": { "$ref": "#/$defs/baseMotionIntent" } } } },
+        { "if": { "properties": { "actuatorGroup": { "const": "MANIPULATOR" } } }, "then": { "properties": { "intent": { "oneOf": [{ "$ref": "#/$defs/armMotionIntent" }, { "$ref": "#/$defs/gripperIntent" }] } } } }
+      ]
+    },
+    "realtimeSessionDescription": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "sdp"],
+      "properties": {
+        "type": { "enum": ["offer", "answer"] },
+        "sdp": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "realtimeIceCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate"],
+      "properties": {
+        "candidate": { "$ref": "#/$defs/nonEmptyString" },
+        "sdpMid": { "$ref": "#/$defs/nonEmptyString" },
+        "sdpMLineIndex": { "type": "integer", "minimum": 0 },
+        "usernameFragment": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "realtimeSignalingMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "messageId", "signalingId", "sessionId", "from", "sentAtUnixMs", "payload"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" },
+        "messageId": { "$ref": "#/$defs/nonEmptyString" },
+        "signalingId": { "$ref": "#/$defs/nonEmptyString" },
+        "sessionId": { "$ref": "#/$defs/nonEmptyString" },
+        "from": { "enum": ["OPERATOR", "ROBOT_EDGE"] },
+        "sentAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "payload": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false, "required": ["kind", "description"],
+              "properties": { "kind": { "const": "OFFER" }, "description": { "$ref": "#/$defs/realtimeSessionDescription", "properties": { "type": { "const": "offer" } } } }
+            },
+            {
+              "type": "object", "additionalProperties": false, "required": ["kind", "description"],
+              "properties": { "kind": { "const": "ANSWER" }, "description": { "$ref": "#/$defs/realtimeSessionDescription", "properties": { "type": { "const": "answer" } } } }
+            },
+            {
+              "type": "object", "additionalProperties": false, "required": ["kind", "candidate"],
+              "properties": { "kind": { "const": "ICE_CANDIDATE" }, "candidate": { "oneOf": [{ "$ref": "#/$defs/realtimeIceCandidate" }, { "type": "null" }] } }
+            },
+            { "type": "object", "additionalProperties": false, "required": ["kind"], "properties": { "kind": { "const": "CONNECTED" } } },
+            {
+              "type": "object", "additionalProperties": false, "required": ["kind", "reason"],
+              "properties": { "kind": { "const": "CLOSE" }, "reason": { "$ref": "#/$defs/nonEmptyString" } }
+            }
+          ]
+        }
+      }
+    },
+    "observationBundleReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observationId", "robotId", "capturedAtUnixMs", "sceneRevision", "calibrationVersion", "frameIds"],
+      "properties": {
+        "observationId": { "$ref": "#/$defs/nonEmptyString" },
+        "robotId": { "$ref": "#/$defs/nonEmptyString" },
+        "capturedAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "sceneRevision": { "$ref": "#/$defs/nonEmptyString" },
+        "calibrationVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "frameIds": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmptyString" } }
+      }
+    },
+    "assistanceRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "requestId", "robotId", "taskId", "reason", "requestedInput", "observations", "createdAtUnixMs", "expiresAtUnixMs"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" },
+        "requestId": { "$ref": "#/$defs/nonEmptyString" },
+        "robotId": { "$ref": "#/$defs/nonEmptyString" },
+        "taskId": { "$ref": "#/$defs/nonEmptyString" },
+        "reason": { "enum": ["OBJECT_NOT_RECOGNIZED", "MULTIPLE_OBJECTS_AMBIGUOUS", "OBJECT_POSE_UNCERTAIN", "NO_VALID_GRASP", "OBJECT_LOST", "GRASP_VERIFICATION_FAILED", "DESTINATION_UNKNOWN"] },
+        "requestedInput": { "enum": ["SELECT_TARGET", "DISAMBIGUATE_TARGET", "PROVIDE_GRASP_HINT", "SELECT_DESTINATION", "APPROVE_PLAN", "DIRECT_TELEOP"] },
+        "observations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/observationBundleReference" } },
+        "createdAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "expiresAtUnixMs": { "$ref": "#/$defs/unixMs" }
+      }
+    },
+    "objectSelection": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["kind", "frameId", "x", "y"],
+          "properties": { "kind": { "const": "POINT" }, "frameId": { "$ref": "#/$defs/nonEmptyString" }, "x": { "type": "number" }, "y": { "type": "number" } }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["kind", "frameId", "x", "y", "width", "height"],
+          "properties": { "kind": { "const": "BOX" }, "frameId": { "$ref": "#/$defs/nonEmptyString" }, "x": { "type": "number" }, "y": { "type": "number" }, "width": { "type": "number", "exclusiveMinimum": 0 }, "height": { "type": "number", "exclusiveMinimum": 0 } }
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["kind", "frameId", "maskArtifactId"],
+          "properties": { "kind": { "const": "MASK" }, "frameId": { "$ref": "#/$defs/nonEmptyString" }, "maskArtifactId": { "$ref": "#/$defs/nonEmptyString" } }
+        }
+      ]
+    },
+    "objectDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "declarationId", "requestId", "observationId", "revision", "declaredBy", "declaredAtUnixMs", "selection", "manipulationIntent", "persistenceScope"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" },
+        "declarationId": { "$ref": "#/$defs/nonEmptyString" },
+        "requestId": { "$ref": "#/$defs/nonEmptyString" },
+        "observationId": { "$ref": "#/$defs/nonEmptyString" },
+        "revision": { "$ref": "#/$defs/positiveRevision" },
+        "declaredBy": { "$ref": "#/$defs/nonEmptyString" },
+        "declaredAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "selection": { "$ref": "#/$defs/objectSelection" },
+        "semanticLabel": { "$ref": "#/$defs/nonEmptyString" },
+        "manipulationIntent": { "enum": ["PICK", "PLACE", "PUSH", "TURN", "INSPECT"] },
+        "persistenceScope": { "enum": ["ATTEMPT_ONLY", "CURRENT_SCENE", "SITE_ENROLLMENT_CANDIDATE"] },
+        "graspHint": {
+          "type": "object", "additionalProperties": false, "required": ["frameId", "approachVector"],
+          "properties": { "frameId": { "$ref": "#/$defs/nonEmptyString" }, "approachVector": { "$ref": "#/$defs/vector3" } }
+        }
+      }
+    },
+    "pose3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frameId", "positionMeters", "orientationXyzw"],
+      "properties": { "frameId": { "$ref": "#/$defs/nonEmptyString" }, "positionMeters": { "$ref": "#/$defs/vector3" }, "orientationXyzw": { "$ref": "#/$defs/vector4" } }
+    },
+    "groundedObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "objectId", "requestId", "declarationId", "declarationRevision", "observationId", "robotId", "sceneRevision", "revision", "status", "pose", "dimensionsMeters", "positionStdDevMeters", "groundedAtUnixMs", "validUntilUnixMs", "algorithm"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" },
+        "objectId": { "$ref": "#/$defs/nonEmptyString" },
+        "requestId": { "$ref": "#/$defs/nonEmptyString" },
+        "declarationId": { "$ref": "#/$defs/nonEmptyString" },
+        "declarationRevision": { "$ref": "#/$defs/positiveRevision" },
+        "observationId": { "$ref": "#/$defs/nonEmptyString" },
+        "robotId": { "$ref": "#/$defs/nonEmptyString" },
+        "sceneRevision": { "$ref": "#/$defs/nonEmptyString" },
+        "revision": { "$ref": "#/$defs/positiveRevision" },
+        "status": { "enum": ["GROUNDED", "TRACKED", "LOST", "STALE", "INVALIDATED"] },
+        "pose": { "$ref": "#/$defs/pose3" },
+        "dimensionsMeters": { "$ref": "#/$defs/vector3" },
+        "positionStdDevMeters": { "$ref": "#/$defs/vector3" },
+        "groundedAtUnixMs": { "$ref": "#/$defs/unixMs" },
+        "validUntilUnixMs": { "$ref": "#/$defs/unixMs" },
+        "algorithm": {
+          "type": "object", "additionalProperties": false, "required": ["name", "version"],
+          "properties": { "name": { "$ref": "#/$defs/nonEmptyString" }, "version": { "$ref": "#/$defs/nonEmptyString" } }
+        }
+      }
+    },
+    "manipulationPlanPreview": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractVersion", "planId", "requestId", "robotId", "objectId", "objectRevision", "sceneRevision", "planRevision", "generatedAtUnixMs", "approvalRequired", "phases", "expectedOutcome"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" }, "planId": { "$ref": "#/$defs/nonEmptyString" },
+        "requestId": { "$ref": "#/$defs/nonEmptyString" }, "robotId": { "$ref": "#/$defs/nonEmptyString" },
+        "objectId": { "$ref": "#/$defs/nonEmptyString" }, "objectRevision": { "$ref": "#/$defs/positiveRevision" },
+        "sceneRevision": { "$ref": "#/$defs/nonEmptyString" }, "planRevision": { "$ref": "#/$defs/positiveRevision" },
+        "generatedAtUnixMs": { "$ref": "#/$defs/unixMs" }, "approvalRequired": { "type": "boolean" },
+        "phases": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmptyString" } },
+        "expectedOutcome": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "manipulationApproval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractVersion", "approvalId", "requestId", "planId", "planRevision", "objectRevision", "sceneRevision", "approvedBy", "approvedAtUnixMs"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" }, "approvalId": { "$ref": "#/$defs/nonEmptyString" },
+        "requestId": { "$ref": "#/$defs/nonEmptyString" }, "planId": { "$ref": "#/$defs/nonEmptyString" },
+        "planRevision": { "$ref": "#/$defs/positiveRevision" }, "objectRevision": { "$ref": "#/$defs/positiveRevision" },
+        "sceneRevision": { "$ref": "#/$defs/nonEmptyString" }, "approvedBy": { "$ref": "#/$defs/nonEmptyString" },
+        "approvedAtUnixMs": { "$ref": "#/$defs/unixMs" }
+      }
+    },
+    "manipulationOutcome": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contractVersion", "outcomeId", "requestId", "planId", "planRevision", "success", "verification", "completedAtUnixMs"],
+      "properties": {
+        "contractVersion": { "$ref": "#/$defs/contractVersion" }, "outcomeId": { "$ref": "#/$defs/nonEmptyString" },
+        "requestId": { "$ref": "#/$defs/nonEmptyString" }, "planId": { "$ref": "#/$defs/nonEmptyString" },
+        "planRevision": { "$ref": "#/$defs/positiveRevision" }, "success": { "type": "boolean" },
+        "verification": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmptyString" } },
+        "completedAtUnixMs": { "$ref": "#/$defs/unixMs" }, "failureCode": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "allOf": [
+        { "if": { "properties": { "success": { "const": false } } }, "then": { "required": ["failureCode"] } }
+      ]
+    }
+  }
+}

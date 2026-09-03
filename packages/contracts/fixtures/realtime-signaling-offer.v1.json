@@ -1,0 +1,15 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "messageId": "signal-message-001",
+  "signalingId": "signaling-001",
+  "sessionId": "session-001",
+  "from": "OPERATOR",
+  "sentAtUnixMs": 1730000000000,
+  "payload": {
+    "kind": "OFFER",
+    "description": {
+      "type": "offer",
+      "sdp": "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=BRASH\r\nt=0 0\r\n"
+    }
+  }
+}

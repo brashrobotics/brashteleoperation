@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BRASH">
+  <rect width="512" height="512" rx="96" fill="#0c100f"/>
+  <path d="M112 92h222l66 66v262H178l-66-66V92Z" fill="#c8f560"/>
+  <path d="M203 170h91c46 0 74 22 74 61 0 25-13 43-35 52 28 8 44 29 44 58 0 48-34 72-87 72h-87V170Zm82 94c21 0 31-9 31-25s-10-24-31-24h-30v49h30Zm5 104c23 0 35-10 35-29 0-18-12-27-35-27h-35v56h35Z" fill="#0c100f"/>
+</svg>

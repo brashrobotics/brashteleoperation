@@ -1,0 +1,20 @@
+{
+  "name": "BRASH Operator Station",
+  "short_name": "BRASH",
+  "description": "Mobile-ready assistance, supervision, and teleoperation session setup for BRASH robots.",
+  "id": "/operator/",
+  "start_url": "/operator/",
+  "scope": "/operator/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c100f",
+  "theme_color": "#0c100f",
+  "icons": [
+    {
+      "src": "/operator/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

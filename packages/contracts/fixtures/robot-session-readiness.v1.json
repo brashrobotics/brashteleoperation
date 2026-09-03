@@ -1,0 +1,12 @@
+{
+  "contractVersion": { "major": 1, "minor": 0 },
+  "readinessId": "readiness-001",
+  "sessionId": "session-001",
+  "robotId": "b2-unit-001",
+  "operatorId": "operator-001",
+  "leaseRevision": 1,
+  "ownershipRevision": 3,
+  "ownershipStatus": "OWNED",
+  "actuatorGroup": "BASE",
+  "reportedAtUnixMs": 1700000000300
+}
