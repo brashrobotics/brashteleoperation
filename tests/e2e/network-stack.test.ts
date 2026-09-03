@@ -56,9 +56,27 @@ test("networked loopback stack completes direct control and unknown-object assis
   const edge = await startRobotAgentTestServer({
     bearerToken: edgeToken,
     agent,
+    operatorOrigin: "http://127.0.0.1:4310",
     onReadinessReport: (report) => { readinessReporter.enqueue(report); },
   });
   try {
+    const preflight = await fetch(`${edge.url}/edge/v1/commands`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://127.0.0.1:4310",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization, content-type",
+      },
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "http://127.0.0.1:4310");
+
+    const deniedPreflight = await fetch(`${edge.url}/edge/v1/commands`, {
+      method: "OPTIONS",
+      headers: { origin: "https://untrusted.example" },
+    });
+    assert.equal(deniedPreflight.status, 400);
+
     const unauthorized = await getJson(`${edge.url}/edge/v1/state`);
     assert.equal(unauthorized.status, 401);
     assert.equal(unauthorized.body.code, "UNAUTHORIZED");

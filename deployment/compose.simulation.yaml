@@ -15,7 +15,7 @@ services:
       BRASH_TELEOP_OPERATOR_ID: "${BRASH_TELEOP_OPERATOR_ID:-operator-001}"
       BRASH_TELEOP_ROBOT_ID: "b2-unit-001"
       BRASH_TELEOP_ROBOT_CONTROL_TOKEN: "${BRASH_TELEOP_ROBOT_CONTROL_TOKEN:?set BRASH_TELEOP_ROBOT_CONTROL_TOKEN}"
-      BRASH_TELEOP_OPERATOR_CONNECT_ORIGINS: "http://127.0.0.1:4312"
+      BRASH_TELEOP_OPERATOR_CONNECT_ORIGINS: "http://127.0.0.1:4311,http://127.0.0.1:4312"
     volumes:
       - control-state:/var/lib/brash-teleoperation
     read_only: true
@@ -43,6 +43,7 @@ services:
       BRASH_TELEOP_ROBOT_ID: "b2-unit-001"
       BRASH_TELEOP_ROBOT_PROFILE: "/app/config/robot-profiles/b2-z1.simulation.json"
       BRASH_TELEOP_CONTROL_URL: "http://127.0.0.1:4310/"
+      BRASH_TELEOP_OPERATOR_ORIGIN: "http://127.0.0.1:4310"
       BRASH_TELEOP_ROBOT_CONTROL_TOKEN: "${BRASH_TELEOP_ROBOT_CONTROL_TOKEN:?set BRASH_TELEOP_ROBOT_CONTROL_TOKEN}"
     read_only: true
     tmpfs: ["/tmp"]

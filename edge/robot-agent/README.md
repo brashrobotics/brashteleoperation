@@ -36,7 +36,8 @@ public key belongs at the edge.
 
 `src/server.ts` exposes this composition through an authenticated,
 loopback-only HTTP test transport and runs the local watchdog independently of
-inbound requests.
+inbound requests. An optional exact loopback `operatorOrigin` enables CORS for
+the B2W Gazebo console; no wildcard or non-loopback browser origin is accepted.
 
 `src/realtime-command-channel.ts` supplies the transport-independent core for a
 future WebRTC data channel or WebSocket adapter: heartbeat timeout, bounded

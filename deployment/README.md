@@ -34,6 +34,14 @@ for the explicit simulation profile. The edge process does not link ROS 2 or a
 physical Unitree SDK. Open `http://127.0.0.1:4310/operator` for the local
 console.
 
+For B2W driving, start the Gazebo launch from `../brashquadrupedcontroller`
+with `teleop_bridge:=true` and the same `BRASH_TELEOP_EDGE_TOKEN` used here.
+The Direct control tab connects to `http://127.0.0.1:4311`; the credential is
+kept in browser memory only. The ROS bridge supplies controller health and
+measured stopped acknowledgement, then maps accepted X/yaw output only to the
+Gazebo wheel controller. Held input release and the independent edge watchdog
+both command zero.
+
 The media simulator creates a new unknown-object assistance request with a
 frozen synthetic RGB-D observation on startup. Enter
 `http://127.0.0.1:4312` in the console's optional **Media API** field to load

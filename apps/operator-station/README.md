@@ -8,7 +8,8 @@ sessions and assistance requests, displays immutable observation provenance,
 loads a bounded and hash-verified frozen RGB preview from an optional media API,
 supports pointer/touch box declarations in source-image coordinates, binds
 approval to the exact active plan revision, escalates to direct teleoperation,
-creates short-lived direct-base leases, and shows a read-only registry of
+creates short-lived direct-base leases, drives the loopback-only B2W Gazebo
+adapter with held touch or keyboard controls, and shows a read-only registry of
 reviewed object knowledge. A one-second, low-rate state refresh makes robot-side
 grounding, planning, and simulated completion visible without disturbing an
 unchanged declaration form or active pointer selection.
@@ -17,14 +18,19 @@ It includes a web-app manifest, mobile safe-area layout, lifecycle notices, and
 a network-only service worker, so it can be installed as a low-rate assistance
 PWA. The worker clears prior BRASH caches and never creates an offline cache:
 assistance, approval, lease, and safety state must not be presented from stale
-storage. Direct mobile motion remains disabled pending the native real-time
-client described in the
+storage. The development B2W controls connect only to an exact HTTP loopback
+edge origin, keep the edge credential in memory, emit 150 ms commands while a
+direction/deadman is held, and request robot-local hold on release, background,
+or pointer loss. Physical direct mobile motion remains disabled pending the
+native real-time client described in the
 [mobile application boundary](../operator-mobile/README.md).
 
-The browser intentionally has no actuator connection. Lease creation clearly
-stops before edge installation, stopped ownership acknowledgement, safety
-enablement, and the real-time deadman channel. That separation prevents a web
-form or control-plane outage from becoming a motor-control mechanism.
+The simulation browser path installs its lease at the development edge and
+waits for the ROS bridge to report measured stopped state and controller health
+before enabling. Its downstream adapter publishes only to Gazebo controller
+topics. The Unitree SDK and physical command topics remain absent. Production
+browser control still requires the real-time channel described by the
+architecture.
 
 The optional media API URL must be HTTPS, except for loopback development. The
 client requests a short-lived observation grant, keeps it only in memory,
@@ -106,9 +112,17 @@ Outputs:
 - Device disconnection clears the active input mode.
 - Reconnection returns to observe/hold; motion does not resume automatically.
 
+## B2W simulator controls
+
+Start the teleoperation Compose stack, then launch the embodied controller with
+`teleop_bridge:=true`. In the Direct control tab enter the loopback edge origin
+and the development edge token. Touch controls use a held direction as their
+deadman. Keyboard controls require holding Space plus W/A/S/D. Every release
+requests hold and the edge watchdog independently zeros stale commands.
+
 ## Next milestone
 
 Add depth-aligned overlays, lasso/mask correction, live-but-clearly-distinct
-context video, and production WebRTC accepted-command feedback. Direct browser
+context video, and production WebRTC accepted-command feedback. Physical browser
 motion remains disabled. Browser UI automation also remains pending; current
 network tests validate the backing APIs, robot worker, and revision rules.

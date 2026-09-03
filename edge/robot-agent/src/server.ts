@@ -30,12 +30,16 @@ export interface RobotAgentTestServerOptions {
   metrics?: MetricRegistry;
   watchdogIntervalMs?: number;
   onReadinessReport?: (report: RobotSessionReadinessReport) => void;
+  operatorOrigin?: string;
 }
 
 export async function startRobotAgentTestServer(options: RobotAgentTestServerOptions): Promise<RunningHttpServer> {
   const host = options.host ?? "127.0.0.1";
   if (!isLoopback(host)) throw new Error("The robot-agent HTTP test transport is restricted to loopback.");
   if (options.bearerToken.length < 16) throw new Error("Robot-agent bearer token must contain at least 16 characters.");
+  const operatorOrigin = options.operatorOrigin === undefined
+    ? undefined
+    : validatedLoopbackOrigin(options.operatorOrigin);
   const metrics = options.metrics ?? new MetricRegistry();
   const emitReadiness = (sessionId: string): void => {
     if (!options.onReadinessReport) return;
@@ -49,6 +53,14 @@ export async function startRobotAgentTestServer(options: RobotAgentTestServerOpt
   const watchdogIntervalMs = options.watchdogIntervalMs ?? 25;
   if (!Number.isSafeInteger(watchdogIntervalMs) || watchdogIntervalMs < 5) throw new Error("Edge watchdog interval must be at least 5 ms.");
   const server = createServer(async (request, response) => {
+    const requestOrigin = request.headers.origin;
+    if (operatorOrigin !== undefined && requestOrigin === operatorOrigin) {
+      response.setHeader("access-control-allow-origin", operatorOrigin);
+      response.setHeader("access-control-allow-headers", "authorization, content-type");
+      response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+      response.setHeader("access-control-max-age", "600");
+      response.setHeader("vary", "Origin");
+    }
     const route = normalizedEdgeRoute(request.url ?? "/");
     response.once("finish", () => {
       metrics.increment("brash_teleoperation_edge_http_requests_total", "Completed edge HTTP test requests.", {
@@ -57,6 +69,14 @@ export async function startRobotAgentTestServer(options: RobotAgentTestServerOpt
     });
     try {
       const url = new URL(request.url ?? "/", "http://robot-agent.local");
+      if (request.method === "OPTIONS") {
+        if (operatorOrigin === undefined || requestOrigin !== operatorOrigin) {
+          fail("EDGE_OPERATOR_ORIGIN_DENIED", "Browser origin is not allowed by the simulation edge.");
+        }
+        response.statusCode = 204;
+        response.end();
+        return;
+      }
       if (request.method === "GET" && url.pathname === "/health") {
         return sendJson(response, 200, { ok: true, service: "brash-robot-agent-test-transport", commandTransport: "http-test-only" });
       }
@@ -210,7 +230,21 @@ export async function startRobotAgentTestServer(options: RobotAgentTestServerOpt
 }
 
 function isLoopback(host: string): boolean {
-  return host === "127.0.0.1" || host === "::1" || host === "localhost";
+  return host === "127.0.0.1" || host === "::1" || host === "[::1]" || host === "localhost";
+}
+
+function validatedLoopbackOrigin(value: string): string {
+  const url = new URL(value);
+  if ((url.protocol !== "http:" && url.protocol !== "https:")
+    || !isLoopback(url.hostname)
+    || url.username !== ""
+    || url.password !== ""
+    || url.pathname !== "/"
+    || url.search !== ""
+    || url.hash !== "") {
+    throw new Error("Robot-agent operatorOrigin must be an exact loopback HTTP(S) origin.");
+  }
+  return url.origin;
 }
 
 function normalizedEdgeRoute(rawUrl: string): string {

@@ -15,8 +15,10 @@ test("installable operator shell remains network-only and labels its mobile boun
   const application = await readFile(new URL("app.js", publicRoot), "utf8");
 
   assert.match(html, /rel="manifest" href="\/operator\/manifest\.webmanifest"/);
-  assert.match(html, /Direct touch-to-motion remains disabled/);
+  assert.match(html, /physical touch-to-motion remains disabled/);
   assert.match(html, /id="media-api-url"/);
+  assert.match(html, /id="edge-api-url"/);
+  assert.match(html, /B2W Gazebo only/);
   assert.equal(manifest.start_url, "/operator/");
   assert.equal(manifest.scope, "/operator/");
   assert.equal(manifest.display, "standalone");
@@ -26,5 +28,10 @@ test("installable operator shell remains network-only and labels its mobile boun
   assert.match(application, /x-brash-observation-id/);
   assert.match(application, /crypto\.subtle\.digest\("SHA-256"/);
   assert.match(application, /enableBoxSelection/);
+  assert.match(application, /normalizeEdgeApiUrl/);
+  assert.match(application, /deadman:true/);
+  assert.match(application, /edge\/v1\/safety\/hold/);
+  assert.doesNotMatch(application, /hardware\/cmd_vel/);
   assert.doesNotMatch(application, /sessionStorage\.setItem\([^\n]*accessToken/);
+  assert.doesNotMatch(application, /sessionStorage\.setItem\([^\n]*edgeToken/);
 });

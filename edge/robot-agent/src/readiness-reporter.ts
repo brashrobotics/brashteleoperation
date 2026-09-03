@@ -214,6 +214,10 @@ export class RobotReadinessReporter {
       await this.draining;
     } finally {
       this.draining = undefined;
+      // A newer report can replace the entry while the previous publication is
+      // in flight. Its eager timer may observe `draining` and return before this
+      // publication completes, so schedule another pass after clearing it.
+      if (this.automaticDelivery && this.pending.size > 0 && !this.closed) this.schedule(0);
     }
     return this.snapshot();
   }

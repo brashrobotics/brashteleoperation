@@ -74,11 +74,12 @@ const running = await startRobotAgentTestServer({
   bearerToken,
   host: process.env.BRASH_TELEOP_EDGE_HOST?.trim() || "127.0.0.1",
   port: Number.parseInt(process.env.BRASH_TELEOP_EDGE_PORT || "4311", 10),
+  operatorOrigin: process.env.BRASH_TELEOP_OPERATOR_ORIGIN?.trim(),
   onReadinessReport: readinessReporter ? (report) => { readinessReporter.enqueue(report); } : undefined,
 });
 
 console.log(`BRASH robot-agent HTTP test transport ready at ${running.url}`);
-console.log(`Simulation profile ${profile.profileId} loaded. This endpoint does not command ROS 2 or physical hardware.`);
+console.log(`Simulation profile ${profile.profileId} loaded. Physical hardware output remains disabled.`);
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, async () => {

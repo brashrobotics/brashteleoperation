@@ -30,7 +30,7 @@
         </form>
       </section>
 
-      <p class="mobile-boundary"><strong>Mobile assistance preview:</strong> this installable console supports low-rate assistance and lease setup. Direct touch-to-motion remains disabled until the authenticated real-time edge channel and lifecycle interlocks are integrated.</p>
+      <p class="mobile-boundary"><strong>Mobile assistance preview:</strong> this installable console supports low-rate assistance and lease setup. Held controls below are enabled only for the loopback B2W Gazebo bridge; physical touch-to-motion remains disabled.</p>
 
       <div id="notice" class="notice" role="status" aria-live="polite">Enter the local development token to load robot work.</div>
 
@@ -64,18 +64,34 @@
 
       <section id="direct-panel" class="tab-panel hidden">
         <article class="direct-card">
-          <p class="eyebrow">Direct teleoperation</p><h2>Request a base-control lease</h2>
-          <p>This console creates and grants a short-lived control-plane lease. Robot ownership, safety enablement, and the real-time command channel must still be acknowledged at the edge. This screen cannot bypass them.</p>
+          <p class="eyebrow">B2W Gazebo only</p><h2>Connect simulator control</h2>
+          <p>The simulator bridge supplies measured stopped evidence and controller health. This browser still needs an expiring lease, exclusive edge ownership, and robot-local safety enablement.</p>
           <form id="direct-session-form" class="stack-form">
             <label>Robot ID<input id="direct-robot-id" value="b2-unit-001" required></label>
-            <label>Lease duration (seconds)<input id="lease-seconds" type="number" min="5" max="300" value="30" required></label>
-            <button type="submit">Request lease</button>
+            <label>Simulation edge API<input id="edge-api-url" type="url" value="http://127.0.0.1:4311" autocomplete="off" required></label>
+            <label>Simulation edge token<input id="edge-bearer-token" type="password" autocomplete="off" required></label>
+            <label>Lease duration (seconds)<input id="lease-seconds" type="number" min="5" max="300" value="120" required></label>
+            <button type="submit">Connect B2W simulator</button>
           </form>
-          <div id="direct-result" class="result-box">No direct-control lease requested.</div>
+          <div id="direct-result" class="result-box">No simulator control session.</div>
         </article>
         <article class="direct-card caution">
-          <p class="eyebrow">Safety boundary</p><h2>No browser-to-actuator path</h2>
-          <p>High-rate motion must use the authenticated real-time edge channel with a held deadman, command expiry, sequence checks, and robot-local timeout. The initial HTTP console intentionally stops at lease setup.</p>
+          <p class="eyebrow">Safety boundary</p><h2>Physical output disabled</h2>
+          <p>This development path reaches only <code>/velocity_controller/commands</code> inside Gazebo. It cannot start the Unitree SDK or publish to the physical B2W command topic. Production direct control still requires the authenticated real-time channel.</p>
+        </article>
+        <article id="sim-controller" class="direct-card sim-controller hidden">
+          <div class="section-heading compact"><div><p class="eyebrow">Held deadman</p><h2>B2W drive</h2></div><span id="sim-status" class="pill">Disconnected</span></div>
+          <div class="sim-readout"><div><span>Ownership</span><strong id="sim-ownership">—</strong></div><div><span>Safety</span><strong id="sim-safety">—</strong></div><div><span>Accepted X</span><strong id="sim-linear">0.00 m/s</strong></div><div><span>Accepted yaw</span><strong id="sim-yaw">0.00 rad/s</strong></div></div>
+          <label class="speed-control">Speed scale <output id="speed-output">40%</output><input id="speed-scale" type="range" min="10" max="100" value="40" step="5"></label>
+          <div class="drive-pad" aria-label="B2W simulator controls">
+            <button class="drive-button forward" data-linear="1" data-yaw="0" aria-label="Hold to drive forward">W<br><small>forward</small></button>
+            <button class="drive-button left" data-linear="0" data-yaw="1" aria-label="Hold to turn left">A<br><small>left</small></button>
+            <button id="sim-stop" class="drive-button stop" type="button" aria-label="Stop simulator">STOP</button>
+            <button class="drive-button right" data-linear="0" data-yaw="-1" aria-label="Hold to turn right">D<br><small>right</small></button>
+            <button class="drive-button reverse" data-linear="-1" data-yaw="0" aria-label="Hold to drive backward">S<br><small>reverse</small></button>
+          </div>
+          <p class="control-hint">Touch: hold a direction. Keyboard: hold Space plus W/A/S/D. Releasing the control enters robot-local hold; motion never latches.</p>
+          <button id="release-simulator" type="button" class="danger">Release simulator control</button>
         </article>
       </section>
 

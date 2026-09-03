@@ -85,6 +85,44 @@ test("readiness reporter retains only latest state, retries failures, and drops 
   assert.equal(reporter.close().closed, true);
 });
 
+test("readiness queued during an in-flight publication is delivered automatically", async () => {
+  let releaseFirst!: () => void;
+  const firstPublication = new Promise<void>((resolve) => { releaseFirst = resolve; });
+  const delivered: string[] = [];
+  const reporter = new RobotReadinessReporter({
+    now: () => 1_000,
+    publisher: {
+      async publish(report) {
+        delivered.push(report.readinessId);
+        if (report.readinessId === "readiness-owned") await firstPublication;
+      },
+    },
+  });
+
+  reporter.enqueue(readiness({
+    readinessId: "readiness-owned",
+    ownershipRevision: 3,
+    ownershipStatus: "OWNED",
+    actuatorGroup: "BASE",
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  reporter.enqueue(readiness({
+    readinessId: "readiness-cleared",
+    ownershipRevision: 4,
+    ownershipStatus: "NO_OWNER",
+    actuatorGroup: undefined,
+  }));
+  releaseFirst();
+
+  const deadline = Date.now() + 1_000;
+  while (delivered.length < 2 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.deepEqual(delivered, ["readiness-owned", "readiness-cleared"]);
+  assert.equal(reporter.snapshot().queuedSessions, 0);
+  reporter.close();
+});
+
 class RecordingPublisher implements RobotReadinessPublisher {
   failuresRemaining = 0;
   readonly reports: RobotSessionReadinessReport[] = [];

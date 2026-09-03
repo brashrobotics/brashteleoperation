@@ -198,7 +198,7 @@ test("operator assistance console exposes an installable mobile manifest without
     assert.doesNotMatch(csp, /connect-src[^;]*\*/);
     const html = await response.text();
     assert.match(html, /rel="manifest" href="\/operator\/manifest\.webmanifest"/);
-    assert.match(html, /Direct touch-to-motion remains disabled/);
+    assert.match(html, /physical touch-to-motion remains disabled/);
 
     response = await fetch(`${control.url}/operator/manifest.webmanifest`);
     assert.equal(response.status, 200);

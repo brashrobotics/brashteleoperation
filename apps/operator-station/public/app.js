@@ -1,6 +1,8 @@
 const state = {
   token: sessionStorage.getItem("brash.controlToken") || "",
   mediaApiUrl: sessionStorage.getItem("brash.mediaApiUrl") || "",
+  edgeApiUrl: sessionStorage.getItem("brash.edgeApiUrl") || "http://127.0.0.1:4311",
+  edgeToken: "",
   operatorId: "operator-001",
   requests: [],
   sessions: [],
@@ -9,11 +11,21 @@ const state = {
   previewUrl: undefined,
   previewRequest: 0,
   refreshPromise: undefined,
+  simulation: undefined,
+  simulationEdgeState: undefined,
+  commandSequence: 1,
+  commandTimer: undefined,
+  commandInFlight: undefined,
+  deadmanIntent: false,
+  deadmanHeld: false,
+  motion: { linear: 0, yaw: 0 },
+  pressedKeys: new Set(),
 };
 const $ = (selector) => document.querySelector(selector);
 const notice = $("#notice");
 $("#bearer-token").value = state.token;
 $("#media-api-url").value = state.mediaApiUrl;
+$("#edge-api-url").value = state.edgeApiUrl;
 
 $("#connect-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -32,6 +44,45 @@ $("#connect-form").addEventListener("submit", async (event) => {
 });
 $("#refresh").addEventListener("click", () => void refreshAll());
 $("#direct-session-form").addEventListener("submit", requestDirectSession);
+$("#speed-scale").addEventListener("input", () => {
+  $("#speed-output").textContent = `${$("#speed-scale").value}%`;
+});
+$("#sim-stop").addEventListener("click", () => void endSimulatorMotion("Operator pressed stop."));
+$("#release-simulator").addEventListener("click", () => void releaseSimulatorControl());
+for (const button of document.querySelectorAll(".drive-button[data-linear]")) {
+  button.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    button.setPointerCapture(event.pointerId);
+    button.classList.add("active");
+    state.motion = { linear: Number(button.dataset.linear), yaw: Number(button.dataset.yaw) };
+    void beginSimulatorMotion();
+  });
+  const release = (event) => {
+    button.classList.remove("active");
+    if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
+    void endSimulatorMotion("Held simulator control released.");
+  };
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("lostpointercapture", () => {
+    button.classList.remove("active");
+    if (state.deadmanIntent) void endSimulatorMotion("Simulator pointer capture was lost.");
+  });
+}
+document.addEventListener("keydown", (event) => {
+  if (!state.simulation || !["Space", "KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)) return;
+  event.preventDefault();
+  state.pressedKeys.add(event.code);
+  updateKeyboardMotion();
+  if (event.code === "Space" && !event.repeat) void beginSimulatorMotion();
+});
+document.addEventListener("keyup", (event) => {
+  if (!["Space", "KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)) return;
+  state.pressedKeys.delete(event.code);
+  updateKeyboardMotion();
+  if (event.code === "Space") void endSimulatorMotion("Keyboard deadman released.");
+});
 for (const tab of document.querySelectorAll(".tab")) {
   tab.addEventListener("click", () => selectTab(tab.dataset.tab));
 }
@@ -54,6 +105,9 @@ if ("serviceWorker" in navigator) {
 setInterval(() => {
   if (state.token && !document.hidden) void refreshAll({ quiet: true });
 }, 1_000);
+setInterval(() => {
+  if (state.simulation && !document.hidden && !state.deadmanHeld) void refreshSimulationState();
+}, 250);
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -62,6 +116,18 @@ async function api(path, options = {}) {
   });
   const body = await response.json();
   if (!response.ok) throw new Error(`${body.code || "REQUEST_FAILED"}: ${body.message || response.statusText}`);
+  return body;
+}
+
+async function edgeApi(path, options = {}) {
+  if (!state.edgeApiUrl || state.edgeToken.length < 16) throw new Error("SIM_EDGE_NOT_CONFIGURED: enter the simulation edge URL and token.");
+  const response = await fetch(`${state.edgeApiUrl}${path}`, {
+    ...options,
+    cache: "no-store",
+    headers: { "content-type": "application/json", authorization: `Bearer ${state.edgeToken}`, ...(options.headers || {}) },
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(`${body.code || "SIM_EDGE_REQUEST_FAILED"}: ${body.message || response.statusText}`);
   return body;
 }
 
@@ -151,15 +217,251 @@ async function mutateRequest(item, action, fields) {
 async function requestDirectSession(event) {
   event.preventDefault();
   try {
-    const robotId = $("#direct-robot-id").value; const sessionId = crypto.randomUUID();
+    if (state.simulation) throw new Error("SIM_SESSION_ACTIVE: release the current simulator session first.");
+    state.edgeApiUrl = normalizeEdgeApiUrl($("#edge-api-url").value);
+    state.edgeToken = $("#edge-bearer-token").value.trim();
+    if (state.edgeToken.length < 16) throw new Error("SIM_EDGE_TOKEN_INVALID: the edge token must contain at least 16 characters.");
+    sessionStorage.setItem("brash.edgeApiUrl", state.edgeApiUrl);
+    const robotId = $("#direct-robot-id").value;
+    const sessionId = crypto.randomUUID();
+    showNotice("Requesting the lease and robot-local stopped handoff…");
     let body = await api("/control/v1/sessions", { method:"POST", body:JSON.stringify({ sessionId, robotId, operatorId:state.operatorId, scopes:["OBSERVE","CONTROL_BASE"] }) });
     body = await api(`/control/v1/sessions/${sessionId}/grant`, { method:"POST", body:JSON.stringify({ expectedRevision:body.session.revision, leaseDurationMs:Number($("#lease-seconds").value)*1000 }) });
-    const signing = body.signedLease
-      ? `Signed ${body.signedLease.algorithm} · key ${body.signedLease.keyId}`
+    const granted = body;
+    if (body.signedLease) {
+      await edgeApi("/edge/v1/signed-leases", { method:"POST", body:JSON.stringify({ signedLease:body.signedLease }) });
+    } else {
+      await edgeApi("/edge/v1/leases", { method:"POST", body:JSON.stringify({ lease:body.session.lease }) });
+    }
+    body = await api(`/control/v1/sessions/${sessionId}/connecting`, { method:"POST", body:JSON.stringify({ expectedRevision:body.session.revision }) });
+    const connectingSession = body.session;
+    await edgeApi("/edge/v1/ownership/request", { method:"POST", body:JSON.stringify({ sessionId, actuatorGroup:"BASE" }) });
+    const edgeState = await waitForEdgeState((candidate) => candidate.ownership?.status === "OWNED", 8_000);
+    const activeSession = await activateControlSession(connectingSession, 5_000);
+    state.simulation = { session:activeSession, lease:granted.session.lease };
+    state.simulationEdgeState = edgeState;
+    state.commandSequence = 1;
+    await armSimulationSafety();
+    renderSimulationState(state.simulationEdgeState);
+    const signing = granted.signedLease
+      ? `Signed ${granted.signedLease.algorithm} · key ${granted.signedLease.keyId}`
       : "Unsigned simulation lease";
-    $("#direct-result").textContent = `Session ${sessionId}\nStatus ${body.session.status}\nLease r${body.session.lease.revision}\n${signing}\nExpires ${new Date(body.session.lease.expiresAtUnixMs).toLocaleTimeString()}\n\nNext: edge installs lease and performs stopped ownership handoff.`;
-    showNotice("Control-plane lease granted. Edge ownership is still required before motion."); await refreshAll();
+    $("#direct-result").textContent = `Session ${sessionId}\nStatus ${activeSession.status}\nLease r${granted.session.lease.revision}\n${signing}\nExpires ${new Date(granted.session.lease.expiresAtUnixMs).toLocaleTimeString()}\n\nB2W Gazebo ownership and safety are ready.`;
+    showNotice("B2W Gazebo control ready. Hold a direction, or Space plus W/A/S/D.");
+    await refreshAll();
   } catch (error) { showNotice(error.message, true); }
+}
+
+async function activateControlSession(session, timeoutMs) {
+  const deadline = performance.now() + timeoutMs;
+  let lastError;
+  while (performance.now() < deadline) {
+    try {
+      const body = await api(`/control/v1/sessions/${session.sessionId}/activate`, { method:"POST", body:JSON.stringify({ expectedRevision:session.revision }) });
+      return body.session;
+    } catch (error) {
+      lastError = error;
+      await delay(100);
+    }
+  }
+  throw lastError || new Error("SIM_READINESS_TIMEOUT: robot ownership was not reported to the control plane.");
+}
+
+async function waitForEdgeState(predicate, timeoutMs) {
+  const deadline = performance.now() + timeoutMs;
+  let latest;
+  while (performance.now() < deadline) {
+    latest = (await edgeApi("/edge/v1/state")).state;
+    state.simulationEdgeState = latest;
+    if (predicate(latest)) return latest;
+    await delay(100);
+  }
+  throw new Error(`SIM_EDGE_TIMEOUT: B2W bridge did not become ready (ownership ${latest?.ownership?.status || "unknown"}).`);
+}
+
+async function armSimulationSafety() {
+  const deadline = performance.now() + 5_000;
+  let lastError;
+  while (performance.now() < deadline) {
+    try {
+      let edgeState = (await edgeApi("/edge/v1/state")).state;
+      if (edgeState.ownership?.status !== "OWNED") throw new Error("SIM_OWNERSHIP_LOST: B2W simulator is not owned by this session.");
+      if (edgeState.baseSafety?.status !== "ENABLED" && edgeState.baseSafety?.status !== "READY") {
+        edgeState = (await edgeApi("/edge/v1/safety/prepare", { method:"POST", body:JSON.stringify({ expectedRevision:edgeState.baseSafety.revision }) })).state;
+      }
+      if (edgeState.baseSafety?.status === "READY") {
+        edgeState = (await edgeApi("/edge/v1/safety/enable", { method:"POST", body:JSON.stringify({ expectedRevision:edgeState.baseSafety.revision }) })).state;
+      }
+      if (edgeState.baseSafety?.status !== "ENABLED") throw new Error(`SIM_SAFETY_NOT_ENABLED: ${edgeState.baseSafety?.status || "unknown"}.`);
+      state.simulationEdgeState = edgeState;
+      renderSimulationState(edgeState);
+      return edgeState;
+    } catch (error) {
+      lastError = error;
+      await delay(100);
+    }
+  }
+  throw lastError || new Error("SIM_SAFETY_TIMEOUT: simulator interlocks did not become ready.");
+}
+
+async function beginSimulatorMotion() {
+  if (!state.simulation || document.hidden) return;
+  state.deadmanIntent = true;
+  try {
+    await armSimulationSafety();
+    if (!state.deadmanIntent || document.hidden) return;
+    state.deadmanHeld = true;
+    renderSimulationState(state.simulationEdgeState);
+    scheduleSimulatorCommand(0);
+  } catch (error) {
+    state.deadmanIntent = false;
+    state.deadmanHeld = false;
+    showNotice(error.message, true);
+  }
+}
+
+function scheduleSimulatorCommand(delayMs) {
+  clearTimeout(state.commandTimer);
+  if (!state.deadmanHeld) return;
+  state.commandTimer = setTimeout(() => void sendSimulatorCommand(), delayMs);
+}
+
+async function sendSimulatorCommand() {
+  if (!state.deadmanHeld || !state.simulation) return;
+  const now = Date.now();
+  const lease = state.simulation.lease;
+  if (now >= lease.expiresAtUnixMs) {
+    await endSimulatorMotion("Simulation lease expired.");
+    showNotice("Simulation lease expired; reconnect before commanding motion.", true);
+    return;
+  }
+  const command = {
+    contractVersion:{ major:1, minor:0 },
+    commandId:crypto.randomUUID(),
+    sessionId:lease.sessionId,
+    robotId:lease.robotId,
+    sourceId:lease.operatorId,
+    actuatorGroup:"BASE",
+    sequence:state.commandSequence++,
+    producedAtUnixMs:now,
+    expiresAtUnixMs:Math.min(now + 150, lease.expiresAtUnixMs),
+    deadman:true,
+    intent:{
+      kind:"BASE_MOTION",
+      frameId:"base_link",
+      linearXMetersPerSecond:state.motion.linear * 0.7,
+      linearYMetersPerSecond:0,
+      angularZRadiansPerSecond:state.motion.yaw * 0.7,
+      speedScale:Number($("#speed-scale").value) / 100,
+    },
+  };
+  const operation = edgeApi("/edge/v1/commands", { method:"POST", body:JSON.stringify({ command }) });
+  state.commandInFlight = operation;
+  try {
+    const body = await operation;
+    state.simulationEdgeState = body.state;
+    renderSimulationState(body.state);
+    if (state.deadmanHeld) scheduleSimulatorCommand(50);
+  } catch (error) {
+    state.deadmanIntent = false;
+    state.deadmanHeld = false;
+    renderSimulationState(state.simulationEdgeState);
+    showNotice(error.message, true);
+  } finally {
+    if (state.commandInFlight === operation) state.commandInFlight = undefined;
+  }
+}
+
+async function endSimulatorMotion(reason) {
+  state.deadmanIntent = false;
+  state.deadmanHeld = false;
+  state.motion = { linear:0, yaw:0 };
+  clearTimeout(state.commandTimer);
+  state.commandTimer = undefined;
+  for (const button of document.querySelectorAll(".drive-button.active")) button.classList.remove("active");
+  if (!state.simulation) return;
+  try {
+    await state.commandInFlight;
+    const current = (await edgeApi("/edge/v1/state")).state;
+    state.simulationEdgeState = current.baseSafety?.status === "ENABLED"
+      ? (await edgeApi("/edge/v1/safety/hold", { method:"POST", body:JSON.stringify({ expectedRevision:current.baseSafety.revision, reason }) })).state
+      : current;
+    renderSimulationState(state.simulationEdgeState);
+  } catch (error) {
+    showNotice(`The client stopped emitting commands; robot-local watchdog owns the stop. ${error.message}`, true);
+  }
+}
+
+async function refreshSimulationState() {
+  try {
+    state.simulationEdgeState = (await edgeApi("/edge/v1/state")).state;
+    renderSimulationState(state.simulationEdgeState);
+  } catch (error) {
+    renderSimulationState(undefined);
+    showNotice(error.message, true);
+  }
+}
+
+function renderSimulationState(edgeState) {
+  $("#sim-controller").classList.toggle("hidden", !state.simulation);
+  if (!state.simulation) return;
+  const ownership = edgeState?.ownership?.status || "UNKNOWN";
+  const safety = edgeState?.baseSafety?.status || "UNKNOWN";
+  const output = edgeState?.baseSafety?.output || {};
+  $("#sim-ownership").textContent = ownership;
+  $("#sim-safety").textContent = safety;
+  $("#sim-linear").textContent = `${Number(output.linearXMetersPerSecond || 0).toFixed(2)} m/s`;
+  $("#sim-yaw").textContent = `${Number(output.angularZRadiansPerSecond || 0).toFixed(2)} rad/s`;
+  $("#sim-status").textContent = state.deadmanHeld ? "COMMANDING" : safety;
+}
+
+async function releaseSimulatorControl() {
+  if (!state.simulation) return;
+  const simulation = state.simulation;
+  await endSimulatorMotion("Operator released simulator control.");
+  try {
+    let edgeState = (await edgeApi("/edge/v1/state")).state;
+    if (edgeState.ownership?.status === "OWNED") {
+      edgeState = (await edgeApi("/edge/v1/ownership/release", { method:"POST", body:JSON.stringify({ expectedRevision:edgeState.ownership.revision, reason:"Operator released simulator control." }) })).state;
+    }
+    if (edgeState.ownership?.status !== "NO_OWNER") {
+      await waitForEdgeState((candidate) => candidate.ownership?.status === "NO_OWNER", 5_000);
+    }
+    await releaseControlSession(simulation.session, 5_000);
+    await edgeApi(`/edge/v1/leases/${encodeURIComponent(simulation.lease.sessionId)}/revoke`, { method:"POST", body:JSON.stringify({ reason:"Simulator session completed." }) });
+    state.simulation = undefined;
+    state.simulationEdgeState = undefined;
+    state.edgeToken = "";
+    $("#edge-bearer-token").value = "";
+    $("#direct-result").textContent = "Simulator control released. The edge confirmed a stopped B2W before ownership cleared.";
+    renderSimulationState(undefined);
+    showNotice("B2W simulator control released safely.");
+    await refreshAll();
+  } catch (error) {
+    showNotice(error.message, true);
+  }
+}
+
+async function releaseControlSession(session, timeoutMs) {
+  const deadline = performance.now() + timeoutMs;
+  let lastError;
+  while (performance.now() < deadline) {
+    try {
+      return (await api(`/control/v1/sessions/${session.sessionId}/release`, { method:"POST", body:JSON.stringify({ expectedRevision:session.revision, reason:"Simulator control released." }) })).session;
+    } catch (error) {
+      lastError = error;
+      await delay(100);
+    }
+  }
+  throw lastError || new Error("SIM_RELEASE_TIMEOUT: stopped ownership was not reported.");
+}
+
+function updateKeyboardMotion() {
+  if (!state.pressedKeys.has("Space")) return;
+  state.motion = {
+    linear:Number(state.pressedKeys.has("KeyW")) - Number(state.pressedKeys.has("KeyS")),
+    yaw:Number(state.pressedKeys.has("KeyA")) - Number(state.pressedKeys.has("KeyD")),
+  };
 }
 
 async function loadObservationPreview(item, observation) {
@@ -316,6 +618,19 @@ function normalizeMediaApiUrl(value) {
   return url.origin;
 }
 
+function normalizeEdgeApiUrl(value) {
+  const url = new URL(value);
+  const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]" || url.hostname === "::1";
+  if (url.protocol !== "http:" || !loopback || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("Simulation edge API must be an exact HTTP loopback origin.");
+  }
+  return url.origin;
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function clearPreview() {
   state.previewRequest += 1;
   if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
@@ -332,7 +647,7 @@ function renderRegistry() {
 }
 function selectTab(name) { for (const tab of document.querySelectorAll(".tab")) { const active=tab.dataset.tab===name; tab.classList.toggle("active",active); tab.setAttribute("aria-selected",String(active)); } for (const panel of document.querySelectorAll(".tab-panel")) panel.classList.add("hidden"); $(`#${name}-panel`).classList.remove("hidden"); }
 function setConnected(online) { $("#connection-dot").className=`dot ${online?"online":"offline"}`; $("#connection-label").textContent=online?"Control plane online":"Disconnected"; }
-function handleClientInterruption(message) { setConnected(false); showNotice(message); }
+function handleClientInterruption(message) { void endSimulatorMotion(message); setConnected(false); showNotice(message); }
 function showNotice(message,error=false) { notice.textContent=message; notice.classList.toggle("error",error); }
 function format(value) { return String(value).toLowerCase().replaceAll("_"," ").replace(/^./,(letter)=>letter.toUpperCase()); }
 function escapeText(value) { const node=document.createElement("span"); node.textContent=String(value); return node.innerHTML; }

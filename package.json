@@ -9,6 +9,7 @@
   "scripts": {
     "demo": "node apps/vertical-slice-demo/src/main.ts",
     "demo:autonomy": "node apps/interactive-autonomy-demo/src/main.ts",
+    "demo:b2w": "node apps/b2w-gazebo-demo/src/main.ts",
     "dev:control": "node apps/control-plane-api/src/dev.ts",
     "dev:edge": "node edge/robot-agent/src/dev.ts",
     "dev:media": "node edge/media-gateway/src/dev.ts",

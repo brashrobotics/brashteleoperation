@@ -69,8 +69,9 @@ Implemented:
 - Edge readiness publisher with bounded HTTP responses, latest-state queuing,
   freshness expiry, retry backoff, and non-blocking ownership hooks.
 - Responsive local operator console for assistance, declaration, plan approval,
-  escalation, lease setup, audit visibility, and pointer/touch box selection on
-  the exact retained observation image.
+  escalation, lease setup, audit visibility, pointer/touch box selection on the
+  exact retained observation image, and held-deadman B2W Gazebo driving through
+  the loopback-only simulation edge.
 - Installable mobile-assistance PWA plus a transport-neutral mobile command core
   that fails closed on backgrounding, screen lock, connection loss, lease
   expiry, deadman release, and process restart.
@@ -87,8 +88,10 @@ Not implemented yet:
 - Native iOS/Android shells, platform identity/secure storage, native media and
   input adapters, device-policy integration, and physical-device qualification
   for direct mobile control.
-- Compiled ROS 2 nodes, vendor SDK integration, measured physical limits, hazard
-  analysis, commissioning evidence, and any physical B2W/Z1 command enablement.
+- Production ROS 2 nodes, vendor SDK command integration, measured physical
+  limits, hazard analysis, commissioning evidence, and any physical B2W/Z1
+  command enablement. A compiled simulation-only B2W Gazebo bridge now lives in
+  `../brashquadrupedcontroller`.
 
 ## Run the first slice
 
@@ -99,12 +102,15 @@ npm install
 npm run verify
 npm run demo
 npm run demo:autonomy
+npm run demo:b2w
 ```
 
 `demo` exercises direct control and one assisted manipulation workflow.
 `demo:autonomy` additionally records reviewed evidence, evaluates and activates
 a site-scoped exemplar, then recognizes and manipulates a future instance
 without a second assistance request.
+`demo:b2w` exercises the live loopback control-plane/edge/ROS/Gazebo path and
+performs a short simulation-only forward motion with stopped-handoff cleanup.
 
 `docker compose --env-file .env -f deployment/compose.simulation.yaml up
 --build` starts a frozen-media simulator and seeds an unknown-object request
@@ -136,6 +142,7 @@ verification. It cannot publish physical commands.
 | Control plane | [Control-plane API](apps/control-plane-api/README.md) | Loopback authenticated session and assistance HTTP API |
 | Development | [Vertical-slice demo](apps/vertical-slice-demo/README.md) | Executable direct-control and unknown-object domain walkthrough |
 | Development | [Interactive-autonomy demo](apps/interactive-autonomy-demo/README.md) | Declare once, review/evaluate, then recognize and act autonomously |
+| Development | [B2W Gazebo teleoperation demo](apps/b2w-gazebo-demo/README.md) | End-to-end lease, safety, motion, stopped-handoff, and release smoke run |
 | Control plane | [Session control](services/session-control/README.md) | Exclusive lease lifecycle and Fleet handoff |
 | Control plane | [Real-time signaling](services/realtime-signaling/README.md) | Expiring, identity-bound WebRTC offer/answer/ICE coordination |
 | Control plane | [Assistance orchestrator](services/assistance-orchestrator/README.md) | Human-assistance workflow and task resumption |
