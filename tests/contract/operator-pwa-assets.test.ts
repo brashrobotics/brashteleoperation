@@ -31,6 +31,10 @@ test("installable operator shell remains network-only and labels its mobile boun
   assert.match(application, /normalizeEdgeApiUrl/);
   assert.match(application, /cleanupFailedSimulatorConnection/);
   assert.match(application, /Simulator connection did not complete/);
+  assert.match(application, /media\/v1\/cameras\/\$\{SIMULATION_CAMERA_ID\}\/access/);
+  assert.match(application, /media\/v1\/cameras\/\$\{SIMULATION_CAMERA_ID\}\/live/);
+  assert.match(application, /x-brash-frame-sequence/);
+  assert.match(application, /stopSimulatorCamera\(\)/);
   assert.match(application, /deadman:true/);
   assert.match(application, /edge\/v1\/safety\/hold/);
   assert.doesNotMatch(application, /hardware\/cmd_vel/);

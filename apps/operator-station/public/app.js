@@ -1,6 +1,6 @@
 const state = {
   token: sessionStorage.getItem("brash.controlToken") || "",
-  mediaApiUrl: sessionStorage.getItem("brash.mediaApiUrl") || "",
+  mediaApiUrl: sessionStorage.getItem("brash.mediaApiUrl") || "http://127.0.0.1:4312",
   edgeApiUrl: sessionStorage.getItem("brash.edgeApiUrl") || "http://127.0.0.1:4311",
   edgeToken: "",
   operatorId: "operator-001",
@@ -20,7 +20,13 @@ const state = {
   deadmanHeld: false,
   motion: { linear: 0, yaw: 0 },
   pressedKeys: new Set(),
+  liveCameraAccessToken: undefined,
+  liveCameraAccessExpiresAt: 0,
+  liveCameraTimer: undefined,
+  liveCameraUrl: undefined,
+  liveCameraGeneration: 0,
 };
+const SIMULATION_CAMERA_ID = "b2w-sim-front";
 const $ = (selector) => document.querySelector(selector);
 const notice = $("#notice");
 $("#bearer-token").value = state.token;
@@ -88,14 +94,17 @@ for (const tab of document.querySelectorAll(".tab")) {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    stopSimulatorCamera();
     handleClientInterruption("Application backgrounded. Any command input is cleared; robot-local watchdog owns the stop.");
   } else {
     showNotice("Foreground restored in observe-only mode. Refresh state and explicitly reacquire control; motion never resumes automatically.");
     if (state.token) void refreshAll({ quiet: true });
+    if (state.simulation) startSimulatorCamera();
   }
 });
 window.addEventListener("pagehide", () => {
   clearPreview();
+  stopSimulatorCamera();
   handleClientInterruption("Application page closed or suspended.");
 });
 if ("serviceWorker" in navigator) {
@@ -250,6 +259,7 @@ async function requestDirectSession(event) {
     state.commandSequence = 1;
     await armSimulationSafety();
     renderSimulationState(state.simulationEdgeState);
+    startSimulatorCamera();
     const signing = granted.signedLease
       ? `Signed ${granted.signedLease.algorithm} · key ${granted.signedLease.keyId}`
       : "Unsigned simulation lease";
@@ -271,6 +281,7 @@ async function cleanupFailedSimulatorConnection(session, edgeLeaseInstalled) {
   state.commandTimer = undefined;
   state.simulation = undefined;
   state.simulationEdgeState = undefined;
+  stopSimulatorCamera();
   renderSimulationState(undefined);
   if (edgeLeaseInstalled && session?.sessionId) {
     try {
@@ -458,6 +469,109 @@ function renderSimulationState(edgeState) {
   $("#sim-status").textContent = state.deadmanHeld ? "COMMANDING" : safety;
 }
 
+function startSimulatorCamera() {
+  stopSimulatorCamera();
+  const generation = state.liveCameraGeneration;
+  setSimulatorCameraStatus(false, "Connecting to Gazebo camera…", "—");
+  state.liveCameraTimer = setTimeout(() => void pollSimulatorCamera(generation), 0);
+}
+
+function stopSimulatorCamera() {
+  state.liveCameraGeneration += 1;
+  clearTimeout(state.liveCameraTimer);
+  state.liveCameraTimer = undefined;
+  state.liveCameraAccessToken = undefined;
+  state.liveCameraAccessExpiresAt = 0;
+  if (state.liveCameraUrl) URL.revokeObjectURL(state.liveCameraUrl);
+  state.liveCameraUrl = undefined;
+  const image = $("#sim-camera-frame");
+  if (image) {
+    image.removeAttribute("src");
+    image.hidden = true;
+  }
+  $("#sim-camera-placeholder")?.classList.remove("hidden");
+  setSimulatorCameraStatus(false, "Camera disconnected", "—");
+}
+
+async function pollSimulatorCamera(generation) {
+  if (generation !== state.liveCameraGeneration || !state.simulation || document.hidden) return;
+  try {
+    if (!state.mediaApiUrl) throw new Error("MEDIA_API_NOT_CONFIGURED: set the Media API to http://127.0.0.1:4312 and reconnect.");
+    if (!state.liveCameraAccessToken || Date.now() >= state.liveCameraAccessExpiresAt - 5_000) {
+      const response = await fetch(`${state.mediaApiUrl}/media/v1/cameras/${SIMULATION_CAMERA_ID}/access`, {
+        method: "POST",
+        redirect: "error",
+        cache: "no-store",
+        headers: { authorization: `Bearer ${state.token}`, "content-type": "application/json" },
+        body: JSON.stringify({ sessionId: state.simulation.session.sessionId, lifetimeMs: 30_000 }),
+      });
+      const body = await readBoundedJson(response, 32 * 1024);
+      if (!response.ok) throw new Error(`${body.code || "MEDIA_ACCESS_FAILED"}: ${body.message || response.statusText}`);
+      if (typeof body.accessToken !== "string" || body.accessToken.length < 1 || body.accessToken.length > 8_000
+        || !Number.isSafeInteger(body.grant?.expiresAtUnixMs)) {
+        throw new Error("MEDIA_ACCESS_INVALID: media gateway returned an invalid live-camera grant.");
+      }
+      state.liveCameraAccessToken = body.accessToken;
+      state.liveCameraAccessExpiresAt = body.grant.expiresAtUnixMs;
+    }
+    const response = await fetch(`${state.mediaApiUrl}/media/v1/cameras/${SIMULATION_CAMERA_ID}/live`, {
+      redirect: "error",
+      cache: "no-store",
+      headers: { authorization: `Bearer ${state.liveCameraAccessToken}` },
+    });
+    if (!response.ok) {
+      const body = await readBoundedJson(response, 32 * 1024);
+      throw new Error(`${body.code || "MEDIA_FRAME_FAILED"}: ${body.message || response.statusText}`);
+    }
+    const cameraId = response.headers.get("x-brash-camera-id");
+    const frameId = response.headers.get("x-brash-frame-id");
+    const sensorFrameId = response.headers.get("x-brash-sensor-frame-id");
+    const sequence = Number(response.headers.get("x-brash-frame-sequence"));
+    const sourceTimestamp = Number(response.headers.get("x-brash-source-timestamp-unix-ms"));
+    const mediaType = response.headers.get("content-type")?.split(";", 1)[0];
+    if (cameraId !== SIMULATION_CAMERA_ID || !frameId || !sensorFrameId || !Number.isSafeInteger(sequence)
+      || sequence < 1 || !Number.isSafeInteger(sourceTimestamp) || sourceTimestamp > Date.now() + 1_000
+      || !["image/jpeg", "image/png", "image/webp", "image/avif"].includes(mediaType)) {
+      throw new Error("MEDIA_FRAME_PROVENANCE_INVALID: live camera headers are incomplete or unsafe.");
+    }
+    const bytes = await readBoundedBytes(response, 8 * 1024 * 1024);
+    const url = URL.createObjectURL(new Blob([bytes], { type: mediaType }));
+    const image = $("#sim-camera-frame");
+    image.src = url;
+    try {
+      await image.decode();
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      image.removeAttribute("src");
+      throw error;
+    }
+    if (generation !== state.liveCameraGeneration || !state.simulation || document.hidden) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    const previousUrl = state.liveCameraUrl;
+    state.liveCameraUrl = url;
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+    image.hidden = false;
+    $("#sim-camera-placeholder").classList.add("hidden");
+    const ageMs = Math.max(0, Date.now() - sourceTimestamp);
+    setSimulatorCameraStatus(true, `${sensorFrameId} · frame ${sequence}`, `${ageMs} ms old`);
+    state.liveCameraTimer = setTimeout(() => void pollSimulatorCamera(generation), 150);
+  } catch (error) {
+    if (generation !== state.liveCameraGeneration || !state.simulation || document.hidden) return;
+    setSimulatorCameraStatus(false, error.message, "retrying");
+    state.liveCameraTimer = setTimeout(() => void pollSimulatorCamera(generation), 1_000);
+  }
+}
+
+function setSimulatorCameraStatus(online, label, age) {
+  const dot = $("#sim-camera-status");
+  if (!dot) return;
+  dot.className = `dot ${online ? "online" : "offline"}`;
+  $("#sim-camera-label").textContent = label;
+  $("#sim-camera-age").textContent = age;
+}
+
 async function releaseSimulatorControl() {
   if (!state.simulation) return;
   const simulation = state.simulation;
@@ -474,6 +588,7 @@ async function releaseSimulatorControl() {
     await edgeApi(`/edge/v1/leases/${encodeURIComponent(simulation.lease.sessionId)}/revoke`, { method:"POST", body:JSON.stringify({ reason:"Simulator session completed." }) });
     state.simulation = undefined;
     state.simulationEdgeState = undefined;
+    stopSimulatorCamera();
     state.edgeToken = "";
     $("#edge-bearer-token").value = "";
     $("#direct-result").textContent = "Simulator control released. The edge confirmed a stopped B2W before ownership cleared.";

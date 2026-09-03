@@ -7,8 +7,9 @@ transport, including stopped evidence and independent base/Z1 safety routes.
 the dedicated low-rate hold contract that BRASH Fleet Control must implement;
 the teleoperation stack already supplies its bounded client adapter.
 [`media-openapi.yaml`](media-openapi.yaml) documents the loopback immutable
-observation-preview adapter, including short-lived scoped grants and provenance
-headers used by the object-declaration interface.
+observation-preview and live Gazebo camera adapter, including robot-authenticated
+ingestion, active-session camera grants, freshness rules, and provenance headers
+used by the object-declaration and direct-control interfaces.
 The control API includes short-lived WebRTC offer/answer/ICE signaling, while
 intentionally excluding high-rate commands and video payloads: those use the
 edge real-time and media boundaries after negotiation. Machine-readable

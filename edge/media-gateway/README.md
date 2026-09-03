@@ -52,18 +52,22 @@ hash is rechecked at retrieval. Quality selection prioritizes freshness and
 explicitly pauses stale media.
 
 `src/server.ts` is a loopback-only test adapter for low-rate immutable image
-previews. It requires per-request operator identity, `media:read` permission,
-an application authorization callback, exact CORS origins, and a short-lived
-observation/camera grant. It exposes provenance headers and safe image media
-types with no-store responses. It is not a production live-video transport.
-Encoding and encrypted WebRTC transport remain deployment adapters; neither
-can grant command authority.
+previews and live Gazebo RGB frames. Robot frame ingestion requires its own
+credential. Live access requires an exact active OBSERVE session for the same
+operator, robot, and camera, then issues a short-lived in-memory camera grant.
+Immutable access additionally applies observation assignment/policy checks. All
+responses enforce exact CORS origins, safe image types, bounded bodies,
+freshness, no-store caching, and explicit provenance headers. This is not a
+production live-video transport. Encoding and encrypted WebRTC transport remain
+deployment adapters; neither can grant command authority.
 
 For an interactive local exercise, start the control API and then run
 `npm run dev:media`. The simulator creates a synthetic RGB-D observation,
 opens an `OBJECT_NOT_RECOGNIZED` request through the robot-authenticated control
 API, serves its frozen preview on port 4312, and starts the
 [simulation assistance worker](../../workers/simulation-assistance/README.md).
+It also registers `b2w-sim-front`; the ROS simulation camera bridge uploads
+fresh PNG frames to that camera using the robot credential.
 After declaration it grounds and plans, waits for exact approval, and completes
 only simulated execution and verification. It never connects to ROS or
 hardware.

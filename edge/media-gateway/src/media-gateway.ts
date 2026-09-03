@@ -135,6 +135,10 @@ export class MediaGateway {
     return clone(camera);
   }
 
+  getCamera(cameraId: string): CameraDescriptor {
+    return clone(this.requireCamera(cameraId));
+  }
+
   ingest(frame: MediaFrame): { accepted: boolean; reason?: string; frameAgeMs: number } {
     const camera = this.requireCamera(frame.cameraId);
     if (frame.robotId !== this.robotId) fail("MEDIA_ROBOT_MISMATCH", "Frame belongs to another robot.");

@@ -14,6 +14,14 @@ reviewed object knowledge. A one-second, low-rate state refresh makes robot-side
 grounding, planning, and simulated completion visible without disturbing an
 unchanged declaration form or active pointer selection.
 
+While a B2W simulator session is active, the direct-control panel requests a
+separate short-lived live-camera grant and displays fresh frames from
+`b2w-sim-front` beside the drive pad. The grant remains in memory, is renewed
+only while the active operator session exists, and is discarded on release or
+backgrounding. Every frame is bounded and checked for camera, sensor-frame,
+sequence, timestamp, and safe image-type provenance before display. Camera
+failure never bypasses or blocks the independent robot-local command watchdog.
+
 It includes a web-app manifest, mobile safe-area layout, lifecycle notices, and
 a network-only service worker, so it can be installed as a low-rate assistance
 PWA. The worker clears prior BRASH caches and never creates an offline cache:
@@ -115,14 +123,17 @@ Outputs:
 ## B2W simulator controls
 
 Start the teleoperation Compose stack, then launch the embodied controller with
-`teleop_bridge:=true`. In the Direct control tab enter the loopback edge origin
-and the development edge token. Touch controls use a held direction as their
-deadman. Keyboard controls require holding Space plus W/A/S/D. Every release
-requests hold and the edge watchdog independently zeros stale commands.
+`teleop_bridge:=true`, or run `./scripts/run-b2w-simulation.sh` from the project
+root. In the Direct control tab enter the loopback edge origin and the
+development edge token. The media origin defaults to `http://127.0.0.1:4312`.
+Touch controls use a held direction as their deadman. Keyboard controls require
+holding Space plus W/A/S/D. Every release requests hold and the edge watchdog
+independently zeros stale commands.
 
 ## Next milestone
 
-Add depth-aligned overlays, lasso/mask correction, live-but-clearly-distinct
-context video, and production WebRTC accepted-command feedback. Physical browser
-motion remains disabled. Browser UI automation also remains pending; current
-network tests validate the backing APIs, robot worker, and revision rules.
+Add depth-aligned overlays, lasso/mask correction, adaptive production WebRTC
+video, and real-time accepted-command feedback. Physical browser motion remains
+disabled. Browser UI automation also remains pending; current network tests
+validate the backing APIs, live simulation media, robot worker, and revision
+rules.

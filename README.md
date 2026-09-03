@@ -71,7 +71,8 @@ Implemented:
 - Responsive local operator console for assistance, declaration, plan approval,
   escalation, lease setup, audit visibility, pointer/touch box selection on the
   exact retained observation image, and held-deadman B2W Gazebo driving through
-  the loopback-only simulation edge.
+  the loopback-only simulation edge, with a fresh authenticated Gazebo front
+  camera view beside the drive controls.
 - Installable mobile-assistance PWA plus a transport-neutral mobile command core
   that fails closed on backgrounding, screen lock, connection loss, lease
   expiry, deadman release, and process restart.
@@ -83,8 +84,9 @@ Not implemented yet:
 - Production OIDC/mTLS identity, PostgreSQL/outbox storage, distributed locking,
   and the Fleet Control server-side teleoperation hold endpoints.
 - Production WebRTC peer/media adapters, TURN/STUN credential provisioning,
-  codecs, live camera rendering, production segmentation and feature models,
-  and a collision-aware MoveIt 2 planning backend.
+  codecs, production camera transport, segmentation and feature models, and a
+  collision-aware MoveIt 2 planning backend. Local simulation currently uses
+  a bounded low-rate HTTP camera adapter instead of WebRTC.
 - Native iOS/Android shells, platform identity/secure storage, native media and
   input adapters, device-policy integration, and physical-device qualification
   for direct mobile control.
@@ -111,6 +113,17 @@ a site-scoped exemplar, then recognizes and manipulates a future instance
 without a second assistance request.
 `demo:b2w` exercises the live loopback control-plane/edge/ROS/Gazebo path and
 performs a short simulation-only forward motion with stopped-handoff cleanup.
+
+After the ROS workspace has been built and `.env` configured, the complete
+B2W stack can also be started from this repository with one command:
+
+```bash
+./scripts/run-b2w-simulation.sh
+```
+
+The command starts the three healthy Compose services and then keeps Gazebo in
+the foreground. Open `http://127.0.0.1:4310/operator/`; Ctrl-C stops Gazebo but
+leaves the restart-safe Compose services running.
 
 `docker compose --env-file .env -f deployment/compose.simulation.yaml up
 --build` starts a frozen-media simulator and seeds an unknown-object request

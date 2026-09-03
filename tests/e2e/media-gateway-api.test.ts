@@ -119,3 +119,92 @@ test("media preview API rejects unapproved origins and overlong grants", async (
   });
   assert.equal(response.status, 400);
 });
+
+test("active operator session receives fresh robot-authenticated simulation frames", async (context) => {
+  let now = 30_000;
+  const gateway = new MediaGateway({
+    robotId: "robot-1",
+    signingSecret: "media-live-signing-secret-at-least-32-bytes",
+    now: () => now,
+    maximumLiveFrameAgeMs: 500,
+  });
+  gateway.registerCamera({ cameraId: "front", robotId: "robot-1", frameId: "front_link", calibrationVersion: "cal-1", kind: "RGB" });
+  const identityProvider = new StaticBearerIdentityProvider([
+    { token: operatorToken, principal: { subject: "operator:1", operatorId: "operator-1", roles: ["OPERATOR"] } },
+    { token: otherToken, principal: { subject: "operator:2", operatorId: "operator-2", roles: ["OPERATOR"] } },
+  ]);
+  const robotToken = "robot-media-ingest-token";
+  const server = await startMediaGatewayTestServer({
+    gateway,
+    identityProvider,
+    robotIngestBearerToken: robotToken,
+    allowedOrigins: ["http://127.0.0.1:4310"],
+    authorizeObservationAccess: () => undefined,
+    authorizeLiveCameraAccess: (principal, camera, sessionId) => {
+      if (principal.operatorId !== "operator-1" || camera.robotId !== "robot-1" || sessionId !== "active-session") {
+        fail("MEDIA_ACCESS_DENIED", "A matching active session is required.");
+      }
+    },
+  });
+  context.after(() => server.close());
+
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  let response = await fetch(`${server.url}/media/v1/cameras/front/frames`, {
+    method: "POST",
+    headers: { authorization: "Bearer invalid-robot-token", "content-type": "application/json" },
+    body: JSON.stringify({
+      frameId: "front-1",
+      robotId: "robot-1",
+      sequence: 1,
+      sourceTimestampUnixMs: now,
+      mediaType: "image/png",
+      bytesBase64: Buffer.from(png).toString("base64"),
+    }),
+  });
+  assert.equal(response.status, 401);
+
+  response = await fetch(`${server.url}/media/v1/cameras/front/frames`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${robotToken}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      frameId: "front-1",
+      robotId: "robot-1",
+      sequence: 1,
+      sourceTimestampUnixMs: now,
+      mediaType: "image/png",
+      bytesBase64: Buffer.from(png).toString("base64"),
+    }),
+  });
+  assert.equal(response.status, 202);
+
+  response = await fetch(`${server.url}/media/v1/cameras/front/access`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${otherToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ sessionId: "active-session", lifetimeMs: 1_000 }),
+  });
+  assert.equal(response.status, 403);
+
+  response = await fetch(`${server.url}/media/v1/cameras/front/access`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${operatorToken}`, "content-type": "application/json", origin: "http://127.0.0.1:4310" },
+    body: JSON.stringify({ sessionId: "active-session", lifetimeMs: 1_000 }),
+  });
+  assert.equal(response.status, 201);
+  const access = await response.json() as { accessToken: string; grant: { resource: string } };
+  assert.equal(access.grant.resource, "LIVE_CAMERAS");
+
+  response = await fetch(`${server.url}/media/v1/cameras/front/live`, {
+    headers: { authorization: `Bearer ${access.accessToken}`, origin: "http://127.0.0.1:4310" },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-brash-camera-id"), "front");
+  assert.equal(response.headers.get("x-brash-sensor-frame-id"), "front_link");
+  assert.equal(response.headers.get("x-brash-frame-sequence"), "1");
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), png);
+
+  now += 501;
+  response = await fetch(`${server.url}/media/v1/cameras/front/live`, {
+    headers: { authorization: `Bearer ${access.accessToken}` },
+  });
+  assert.equal(response.status, 400);
+});

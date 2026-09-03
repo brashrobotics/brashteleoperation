@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: BRASH Immutable Observation Media API
+  title: BRASH Simulation Media API
   version: 0.1.0
-  description: Simulation/test adapter for retrieving the exact frozen RGB frame used by an object declaration. This is not the live production media transport and has no actuator operation.
+  description: Loopback simulation/test adapter for retrieving exact frozen observation frames and bounded, fresh Gazebo camera images. This is not the production WebRTC transport and has no actuator operation.
 servers:
   - url: http://127.0.0.1:4312
 paths:
@@ -11,6 +11,82 @@ paths:
       operationId: getMediaHealth
       responses:
         "200": { description: Service is live }
+  /media/v1/cameras/{cameraId}/frames:
+    parameters:
+      - { name: cameraId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    post:
+      operationId: ingestSimulationCameraFrame
+      description: Accepts a bounded, canonical-base64 image from the separately authenticated robot simulation bridge. Stale, reordered, clock-skewed, oversized, unsafe, or robot-mismatched frames are rejected.
+      security: [{ robotBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LiveFrameIngest"
+      responses:
+        "202": { description: Fresh frame accepted into the bounded live ring }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /media/v1/cameras/{cameraId}/access:
+    parameters:
+      - { name: cameraId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    post:
+      operationId: createLiveCameraGrant
+      description: Issues a short-lived live-camera grant only when the authenticated operator has an exact active OBSERVE session for the camera's robot.
+      security: [{ operatorBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sessionId, lifetimeMs]
+              properties:
+                sessionId: { type: string, minLength: 1 }
+                lifetimeMs: { type: integer, minimum: 1000, maximum: 60000 }
+      responses:
+        "201":
+          description: Short-lived live-camera grant
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [accessToken, grant, camera]
+                properties:
+                  accessToken: { type: string, minLength: 1, writeOnly: true }
+                  grant: { $ref: "#/components/schemas/MediaAccessClaims" }
+                  camera: { $ref: "#/components/schemas/CameraDescriptor" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /media/v1/cameras/{cameraId}/live:
+    parameters:
+      - { name: cameraId, in: path, required: true, schema: { type: string, minLength: 1 } }
+    get:
+      operationId: getLiveSimulationCameraFrame
+      description: Returns the latest frame only while it remains fresh and the live-camera grant is valid for this camera.
+      security: [{ mediaGrant: [] }]
+      responses:
+        "200":
+          description: Latest fresh simulation camera image
+          headers:
+            x-brash-camera-id: { schema: { type: string } }
+            x-brash-frame-id: { schema: { type: string } }
+            x-brash-sensor-frame-id: { schema: { type: string } }
+            x-brash-frame-sequence: { schema: { type: integer, minimum: 1 } }
+            x-brash-source-timestamp-unix-ms: { schema: { type: integer, minimum: 0 } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+            image/avif: { schema: { type: string, format: binary } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /media/v1/observations/{observationId}/access:
     parameters:
       - { name: observationId, in: path, required: true, schema: { type: string, minLength: 1 } }
@@ -82,17 +158,39 @@ paths:
 components:
   securitySchemes:
     operatorBearer: { type: http, scheme: bearer }
+    robotBearer: { type: http, scheme: bearer }
     mediaGrant: { type: http, scheme: bearer }
   schemas:
+    CameraDescriptor:
+      type: object
+      additionalProperties: false
+      required: [cameraId, robotId, frameId, calibrationVersion, kind]
+      properties:
+        cameraId: { type: string, minLength: 1 }
+        robotId: { type: string, minLength: 1 }
+        frameId: { type: string, minLength: 1 }
+        calibrationVersion: { type: string, minLength: 1 }
+        kind: { enum: [RGB, DEPTH] }
+    LiveFrameIngest:
+      type: object
+      additionalProperties: false
+      required: [frameId, robotId, sequence, sourceTimestampUnixMs, mediaType, bytesBase64]
+      properties:
+        frameId: { type: string, minLength: 1 }
+        robotId: { type: string, minLength: 1 }
+        sequence: { type: integer, minimum: 1 }
+        sourceTimestampUnixMs: { type: integer, minimum: 1 }
+        mediaType: { enum: [image/jpeg, image/png, image/webp, image/avif] }
+        bytesBase64: { type: string, minLength: 4, description: Canonical base64 image bytes }
     MediaAccessClaims:
       type: object
       additionalProperties: false
-      required: [operatorId, robotId, cameraIds, resource, observationIds, scope, issuedAtUnixMs, expiresAtUnixMs, nonce]
+      required: [operatorId, robotId, cameraIds, resource, scope, issuedAtUnixMs, expiresAtUnixMs, nonce]
       properties:
         operatorId: { type: string, minLength: 1 }
         robotId: { type: string, minLength: 1 }
         cameraIds: { type: array, minItems: 1, uniqueItems: true, items: { type: string, minLength: 1 } }
-        resource: { const: IMMUTABLE_OBSERVATION }
+        resource: { enum: [LIVE_CAMERAS, IMMUTABLE_OBSERVATION] }
         observationIds: { type: array, minItems: 1, uniqueItems: true, items: { type: string, minLength: 1 } }
         scope: { const: OBSERVE }
         issuedAtUnixMs: { type: integer, minimum: 0 }

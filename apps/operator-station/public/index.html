@@ -25,7 +25,7 @@
         <form id="connect-form" class="connect-form">
           <label>Operator ID<input id="operator-id" value="operator-001" autocomplete="username" required></label>
           <label>Development token<input id="bearer-token" type="password" autocomplete="current-password" required></label>
-          <label>Media API (optional)<input id="media-api-url" type="url" inputmode="url" placeholder="http://127.0.0.1:4312" autocomplete="off"></label>
+          <label>Media API<input id="media-api-url" type="url" inputmode="url" value="http://127.0.0.1:4312" autocomplete="off"></label>
           <button type="submit">Connect</button>
         </form>
       </section>
@@ -82,15 +82,23 @@
         <article id="sim-controller" class="direct-card sim-controller hidden">
           <div class="section-heading compact"><div><p class="eyebrow">Held deadman</p><h2>B2W drive</h2></div><span id="sim-status" class="pill">Disconnected</span></div>
           <div class="sim-readout"><div><span>Ownership</span><strong id="sim-ownership">—</strong></div><div><span>Safety</span><strong id="sim-safety">—</strong></div><div><span>Accepted X</span><strong id="sim-linear">0.00 m/s</strong></div><div><span>Accepted yaw</span><strong id="sim-yaw">0.00 rad/s</strong></div></div>
-          <label class="speed-control">Speed scale <output id="speed-output">40%</output><input id="speed-scale" type="range" min="10" max="100" value="40" step="5"></label>
-          <div class="drive-pad" aria-label="B2W simulator controls">
-            <button class="drive-button forward" data-linear="1" data-yaw="0" aria-label="Hold to drive forward">W<br><small>forward</small></button>
-            <button class="drive-button left" data-linear="0" data-yaw="1" aria-label="Hold to turn left">A<br><small>left</small></button>
-            <button id="sim-stop" class="drive-button stop" type="button" aria-label="Stop simulator">STOP</button>
-            <button class="drive-button right" data-linear="0" data-yaw="-1" aria-label="Hold to turn right">D<br><small>right</small></button>
-            <button class="drive-button reverse" data-linear="-1" data-yaw="0" aria-label="Hold to drive backward">S<br><small>reverse</small></button>
+          <div class="sim-operating-grid">
+            <figure class="live-camera">
+              <div id="sim-camera-viewport" class="live-camera-viewport"><div id="sim-camera-placeholder"><strong>Front camera</strong><br><small>Waiting for a fresh Gazebo frame…</small></div><img id="sim-camera-frame" alt="Live B2W Gazebo front camera" hidden></div>
+              <figcaption><span id="sim-camera-status" class="dot offline"></span><span id="sim-camera-label">Camera disconnected</span><span id="sim-camera-age">—</span></figcaption>
+            </figure>
+            <div class="drive-controls">
+              <label class="speed-control">Speed scale <output id="speed-output">40%</output><input id="speed-scale" type="range" min="10" max="100" value="40" step="5"></label>
+              <div class="drive-pad" aria-label="B2W simulator controls">
+                <button class="drive-button forward" data-linear="1" data-yaw="0" aria-label="Hold to drive forward">W<br><small>forward</small></button>
+                <button class="drive-button left" data-linear="0" data-yaw="1" aria-label="Hold to turn left">A<br><small>left</small></button>
+                <button id="sim-stop" class="drive-button stop" type="button" aria-label="Stop simulator">STOP</button>
+                <button class="drive-button right" data-linear="0" data-yaw="-1" aria-label="Hold to turn right">D<br><small>right</small></button>
+                <button class="drive-button reverse" data-linear="-1" data-yaw="0" aria-label="Hold to drive backward">S<br><small>reverse</small></button>
+              </div>
+              <p class="control-hint">Touch: hold a direction. Keyboard: hold Space plus W/A/S/D. Releasing the control enters robot-local hold; motion never latches.</p>
+            </div>
           </div>
-          <p class="control-hint">Touch: hold a direction. Keyboard: hold Space plus W/A/S/D. Releasing the control enters robot-local hold; motion never latches.</p>
           <button id="release-simulator" type="button" class="danger">Release simulator control</button>
         </article>
       </section>

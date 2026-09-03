@@ -36,6 +36,11 @@ console.
 
 For B2W driving, start the Gazebo launch from `../brashquadrupedcontroller`
 with `teleop_bridge:=true` and the same `BRASH_TELEOP_EDGE_TOKEN` used here.
+The launch also starts the independent front-camera upload bridge, which uses
+`BRASH_TELEOP_MEDIA_INGEST_TOKEN` when set and otherwise the distinct
+`BRASH_TELEOP_ROBOT_CONTROL_TOKEN`. The Direct control view retrieves those
+frames with an operator/session-bound short-lived grant; no camera credential is
+persisted by the browser.
 The Direct control tab connects to `http://127.0.0.1:4311`; the credential is
 kept in browser memory only. The ROS bridge supplies controller health and
 measured stopped acknowledgement, then maps accepted X/yaw output only to the
@@ -52,6 +57,7 @@ plan lets the worker execute only through `SimulatedRobotAdapter`, record its
 outcome, verify it, and resolve the request. The console polls this low-rate
 state automatically.
 
-This process combines an immutable-image test adapter and a simulation-only
-workflow worker for convenience. It is not a live-video implementation, has no
-ROS or vendor SDK dependency, and cannot publish physical commands.
+This process combines immutable-image retrieval, bounded live Gazebo frame
+ingestion, and a simulation-only workflow worker for convenience. It is not a
+production live-video implementation, has no ROS or vendor SDK dependency in
+the containers, and cannot publish physical commands.
